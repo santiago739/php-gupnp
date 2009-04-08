@@ -43,7 +43,8 @@ PHP_RINIT_FUNCTION(gupnp);
 PHP_RSHUTDOWN_FUNCTION(gupnp);
 PHP_MINFO_FUNCTION(gupnp);
 
-PHP_FUNCTION(confirm_gupnp_compiled);	/* For testing, remove later. */
+PHP_FUNCTION(gupnp_control_point_new);	
+PHP_FUNCTION(gupnp_browse_service);	
 
 /* 
   	Declare any global variables you may need between the BEGIN
