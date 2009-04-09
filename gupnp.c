@@ -27,9 +27,7 @@
 #include "ext/standard/info.h"
 #include "php_gupnp.h"
 
-/* If you declare any globals in php_gupnp.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(gupnp)
-*/
 
 typedef struct _php_gupnp_callback_t { /* {{{ */
     zval *func;
@@ -37,21 +35,21 @@ typedef struct _php_gupnp_callback_t { /* {{{ */
 } php_gupnp_callback_t;
 /* }}} */
 
-typedef struct _php_gupnp_cp_t { /* {{{ */
+typedef struct _php_gupnp_cpoint_t { /* {{{ */
 	GUPnPControlPoint *cp;
 	int rsrc_id;
 	php_gupnp_callback_t *callback;
 #ifdef ZTS
 	void ***thread_ctx;
 #endif
-} php_gupnp_cp_t;
+} php_gupnp_cpoint_t;
 /* }}} */
 
 /* True global resources - no need for thread safety here */
-static int le_cp;
+static int le_cpoint;
 
-static GMainLoop *main_loop = NULL;
-static GUPnPContext *context;
+//static GMainLoop *main_loop = NULL;
+//static GUPnPContext *context;
 
 /* {{{ gupnp_functions[]
  *
@@ -100,16 +98,16 @@ PHP_INI_END()
 
 /* {{{ php_gupnp_init_globals
  */
-/* Uncomment this function if you have INI entries
 static void php_gupnp_init_globals(zend_gupnp_globals *gupnp_globals)
 {
-	gupnp_globals->global_value = 0;
-	gupnp_globals->global_string = NULL;
+	gupnp_globals->main_loop = NULL;
+	gupnp_globals->context = NULL;
 }
-*/
 /* }}} */
 
-static inline void _php_gupnp_cp_callback_free(php_gupnp_callback_t *callback) /* {{{ */
+/* {{{ _php_gupnp_cpoint_callback_free
+ */
+static inline void _php_gupnp_cpoint_callback_free(php_gupnp_callback_t *callback) /* {{{ */
 {
 	if (!callback) {
 		return;
@@ -123,20 +121,24 @@ static inline void _php_gupnp_cp_callback_free(php_gupnp_callback_t *callback) /
 }
 /* }}} */
 
-static void _php_gupnp_cp_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
+/* {{{ _php_gupnp_cpoint_dtor
+ */
+static void _php_gupnp_cpoint_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
-	php_gupnp_cp_t *cp = (php_gupnp_cp_t *)rsrc->ptr;
+	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)rsrc->ptr;
 	
-	_php_gupnp_cp_callback_free(cp->callback);
-	g_object_unref(cp->cp);
-	efree(cp);
+	_php_gupnp_cpoint_callback_free(cpoint->callback);
+	g_object_unref(cpoint->cp);
+	efree(cpoint);
 }
 /* }}} */
 
+/* {{{ _php_gupnp_service_proxy_available_cb
+ */
 static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata)
 {
 	zval *args[1];
-	php_gupnp_cp_t *cpoint = (php_gupnp_cp_t *)userdata;
+	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
 	php_gupnp_callback_t *callback;
 	zval retval;
 	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
@@ -155,10 +157,11 @@ static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPSe
 	}
 	zval_ptr_dtor(&(args[0]));
 	
-	g_main_loop_quit(main_loop);
+	g_main_loop_quit(GUPNP_G(main_loop));
 	
 	return;
 }
+/* }}} */
 
 /* {{{ PHP_MINIT_FUNCTION
  */
@@ -168,13 +171,14 @@ PHP_MINIT_FUNCTION(gupnp)
 	REGISTER_INI_ENTRIES();
 	*/
 	
-	le_cp = zend_register_list_destructors_ex(_php_gupnp_cp_dtor, NULL, "control point", module_number);
+	le_cpoint = zend_register_list_destructors_ex(_php_gupnp_cpoint_dtor, NULL, "control point", module_number);
 	
 	/* Required initialisation */
 	g_thread_init(NULL);
 	g_type_init();
 	
-	context = gupnp_context_new(NULL, NULL, 0, NULL);
+	//context = gupnp_context_new(NULL, NULL, 0, NULL);
+	GUPNP_G(context) = gupnp_context_new(NULL, NULL, 0, NULL);
 	
 	return SUCCESS;
 }
@@ -189,10 +193,16 @@ PHP_MSHUTDOWN_FUNCTION(gupnp)
 	*/
 	
 	/* Clean up */
-	if (main_loop) {
-		g_main_loop_unref(main_loop);
+	if (GUPNP_G(main_loop)) {
+		//g_main_loop_unref(main_loop);
+		g_main_loop_unref(GUPNP_G(main_loop));
+		
 	}
-	g_object_unref(context);
+	//g_object_unref(context);
+	if (GUPNP_G(context)) {
+		g_object_unref(GUPNP_G(context));
+	}
+	
 	
 	return SUCCESS;
 }
@@ -236,19 +246,19 @@ PHP_FUNCTION(gupnp_control_point_new)
 {
 	char *target = NULL;
 	int target_len;
-	php_gupnp_cp_t *cp = NULL;
+	php_gupnp_cpoint_t *cpoint = NULL;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &target, &target_len) == FAILURE) {
 		return;
 	}
 	
-	cp = emalloc(sizeof(php_gupnp_cp_t));
-	cp->cp = gupnp_control_point_new(context, target);
-	cp->callback = NULL;
-	TSRMLS_SET_CTX(cp->thread_ctx);
-	cp->rsrc_id = zend_list_insert(cp, le_cp);
+	cpoint = emalloc(sizeof(php_gupnp_cpoint_t));
+	cpoint->cp = gupnp_control_point_new(GUPNP_G(context), target);
+	cpoint->callback = NULL;
+	TSRMLS_SET_CTX(cpoint->thread_ctx);
+	cpoint->rsrc_id = zend_list_insert(cpoint, le_cpoint);
 	
-	RETURN_RESOURCE(cp->rsrc_id);
+	RETURN_RESOURCE(cpoint->rsrc_id);
 
 }
 /* }}} */
@@ -257,16 +267,16 @@ PHP_FUNCTION(gupnp_control_point_new)
    Return a string to confirm that the module is compiled in */
 PHP_FUNCTION(gupnp_browse_service)
 {
-	zval *zcp, *zcallback, *zarg = NULL;
+	zval *zcpoint, *zcallback, *zarg = NULL;
 	char *func_name;
 	php_gupnp_callback_t *callback;
-	php_gupnp_cp_t *cp = NULL;
+	php_gupnp_cpoint_t *cpoint = NULL;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rz|z", &zcp, &zcallback, &zarg) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rz|z", &zcpoint, &zcallback, &zarg) == FAILURE) {
 		return;
 	}
 	
-	ZEND_FETCH_RESOURCE(cp, php_gupnp_cp_t *, &zcp, -1, "control point", le_cp)
+	ZEND_FETCH_RESOURCE(cpoint, php_gupnp_cpoint_t *, &zcpoint, -1, "control point", le_cpoint)
 	
 	if (!zend_is_callable(zcallback, 0, &func_name TSRMLS_CC)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
@@ -285,17 +295,20 @@ PHP_FUNCTION(gupnp_browse_service)
 	callback = emalloc(sizeof(php_gupnp_callback_t));
 	callback->func = zcallback;
 	callback->arg = zarg;
-	cp->callback = callback;
+	cpoint->callback = callback;
 	
-	g_signal_connect(cp->cp, "service-proxy-available", G_CALLBACK(_php_gupnp_service_proxy_available_cb), cp);
+	g_signal_connect(cpoint->cp, "service-proxy-available", 
+					 G_CALLBACK(_php_gupnp_service_proxy_available_cb), cpoint);
 
 	/* Tell the Control Point to start searching */
-	gssdp_resource_browser_set_active(GSSDP_RESOURCE_BROWSER(cp->cp), TRUE);
+	gssdp_resource_browser_set_active(GSSDP_RESOURCE_BROWSER(cpoint->cp), TRUE);
   
 	/* Enter the main loop. This will start the search and result in callbacks to
 	   gupnp_service_proxy_available_cb. */
-	main_loop = g_main_loop_new(NULL, FALSE);
-	g_main_loop_run(main_loop);
+	//main_loop = g_main_loop_new(NULL, FALSE);
+	//g_main_loop_run(main_loop);
+	GUPNP_G(main_loop) = g_main_loop_new(NULL, FALSE);
+	g_main_loop_run(GUPNP_G(main_loop));
 
 	RETURN_TRUE;
 }
