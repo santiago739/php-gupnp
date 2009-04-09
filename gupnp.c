@@ -48,9 +48,6 @@ typedef struct _php_gupnp_cpoint_t { /* {{{ */
 /* True global resources - no need for thread safety here */
 static int le_cpoint;
 
-//static GMainLoop *main_loop = NULL;
-//static GUPnPContext *context;
-
 /* {{{ gupnp_functions[]
  *
  * Every user visible function must have an entry in gupnp_functions[].
@@ -177,7 +174,6 @@ PHP_MINIT_FUNCTION(gupnp)
 	g_thread_init(NULL);
 	g_type_init();
 	
-	//context = gupnp_context_new(NULL, NULL, 0, NULL);
 	GUPNP_G(context) = gupnp_context_new(NULL, NULL, 0, NULL);
 	
 	return SUCCESS;
@@ -194,11 +190,9 @@ PHP_MSHUTDOWN_FUNCTION(gupnp)
 	
 	/* Clean up */
 	if (GUPNP_G(main_loop)) {
-		//g_main_loop_unref(main_loop);
 		g_main_loop_unref(GUPNP_G(main_loop));
 		
 	}
-	//g_object_unref(context);
 	if (GUPNP_G(context)) {
 		g_object_unref(GUPNP_G(context));
 	}
@@ -305,8 +299,6 @@ PHP_FUNCTION(gupnp_browse_service)
   
 	/* Enter the main loop. This will start the search and result in callbacks to
 	   gupnp_service_proxy_available_cb. */
-	//main_loop = g_main_loop_new(NULL, FALSE);
-	//g_main_loop_run(main_loop);
 	GUPNP_G(main_loop) = g_main_loop_new(NULL, FALSE);
 	g_main_loop_run(GUPNP_G(main_loop));
 

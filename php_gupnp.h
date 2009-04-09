@@ -46,15 +46,10 @@ PHP_MINFO_FUNCTION(gupnp);
 PHP_FUNCTION(gupnp_control_point_new);	
 PHP_FUNCTION(gupnp_browse_service);	
 
-/* 
-  	Declare any global variables you may need between the BEGIN
-	and END macros here:     
-
 ZEND_BEGIN_MODULE_GLOBALS(gupnp)
-	long  global_value;
-	char *global_string;
+	GMainLoop *main_loop;
+	GUPnPContext *context;
 ZEND_END_MODULE_GLOBALS(gupnp)
-*/
 
 /* In every utility function you add that needs to use variables 
    in php_gupnp_globals, call TSRMLS_FETCH(); after declaring other 
