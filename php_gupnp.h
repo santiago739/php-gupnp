@@ -43,8 +43,10 @@ PHP_RINIT_FUNCTION(gupnp);
 PHP_RSHUTDOWN_FUNCTION(gupnp);
 PHP_MINFO_FUNCTION(gupnp);
 
-PHP_FUNCTION(gupnp_control_point_new);	
-PHP_FUNCTION(gupnp_browse_service);	
+PHP_FUNCTION(gupnp_control_point_new);
+PHP_FUNCTION(gupnp_browse_service);
+PHP_FUNCTION(gupnp_service_info_get);
+PHP_FUNCTION(gupnp_service_proxy_send_action);
 
 ZEND_BEGIN_MODULE_GLOBALS(gupnp)
 	GMainLoop *main_loop;
