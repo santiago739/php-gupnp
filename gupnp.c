@@ -12,7 +12,7 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Author:                                                              |
+  | Author: Alexey Romanenko <santiago739@gmail.com>                     |
   +----------------------------------------------------------------------+
 */
 
@@ -269,8 +269,8 @@ PHP_MINFO_FUNCTION(gupnp)
 }
 /* }}} */
 
-/* {{{ proto string confirm_gupnp_compiled(string arg)
-   Return a string to confirm that the module is compiled in */
+/* {{{ proto resource gupnp_control_point_new(string target)
+   Create a new Control point with the specified target */
 PHP_FUNCTION(gupnp_control_point_new)
 {
 	char *target = NULL;
@@ -348,7 +348,7 @@ PHP_FUNCTION(gupnp_browse_service)
 /* }}} */
 
 /* {{{ proto array gupnp_service_info_get(resource proxy)
-   Return a string to confirm that the module is compiled in */
+   Get info of this service. */
 PHP_FUNCTION(gupnp_service_info_get)
 {
 	zval *zproxy;
@@ -356,7 +356,7 @@ PHP_FUNCTION(gupnp_service_info_get)
 	php_gupnp_service_proxy_t *sproxy;
 	SoupURI* url_base;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &zproxy) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zproxy) == FAILURE) {
 		return;
 	}
 	
@@ -385,8 +385,8 @@ PHP_FUNCTION(gupnp_service_info_get)
 }
 /* }}} */
 
-/* {{{ proto string confirm_gupnp_compiled(string arg)
-   Return a string to confirm that the module is compiled in */
+/* {{{ proto boolean gupnp_service_proxy_send_action(resource proxy, string action, string param_name, zval param_val)
+   Sends action with parameters to the service exposed by proxy synchronously. */
 PHP_FUNCTION(gupnp_service_proxy_send_action)
 {
 	zval *zproxy, *param_val;
@@ -394,56 +394,56 @@ PHP_FUNCTION(gupnp_service_proxy_send_action)
 	int action_len, param_name_len;
 	php_gupnp_service_proxy_t *sproxy;
 	GError *error = NULL;
-	GType param_type = 0;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "zssz", 
+	gboolean target_gbool = 0, result = 0;
+	glong target_glong = 0;
+	gdouble target_gdouble = 0;
+	gchar *target_gchar = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rssz", 
 			&zproxy, &action, &action_len, &param_name, &param_name_len, 
 			&param_val) == FAILURE) {
 		return;
 	}
 	
-	switch (Z_TYPE_P(param_val)) {         
-		case IS_NULL: 
-			php_printf("IS_NULL"); 
-			break; 
-		case IS_BOOL: 
-			param_type = G_TYPE_BOOLEAN;
-			php_printf("IS_BOOL"); 
-			break; 
-		case IS_LONG: 
-			param_type = G_TYPE_LONG;
-			php_printf("IS_LONG"); 
-			break; 
-		case IS_DOUBLE: 
-			param_type = G_TYPE_DOUBLE;
-			php_printf("IS_DOUBLE"); 
-			break; 
-		case IS_STRING: 
-			param_type = G_TYPE_STRING;
-			php_printf("IS_STRING"); 
-			break; 
-		default: 
-			php_printf("unknown z_type"); 
-			break; 
-	}
-	
-	if (param_type <= 0) {
-		RETURN_FALSE;
-	}
-	
 	ZEND_FETCH_RESOURCE(sproxy, php_gupnp_service_proxy_t *, &zproxy, -1, "proxy", le_proxy)
 	
-	convert_to_string(param_val);
-	if (!gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
-			param_name, param_type, param_val, NULL, NULL)) {
-		RETURN_FALSE;
+	switch (Z_TYPE_P(param_val)) {         
+		case IS_BOOL: 
+			if (Z_BVAL_P(param_val)) {
+				target_gbool = 1;
+            } 
+			result = gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
+						param_name, G_TYPE_BOOLEAN, target_gbool, NULL, NULL);
+			break; 
+		case IS_LONG: 
+			target_glong = (glong)Z_LVAL_P(param_val);
+			result = gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
+						param_name, G_TYPE_LONG, target_glong, NULL, NULL);
+			break; 
+		case IS_DOUBLE: 
+			target_gdouble = (gdouble)Z_LVAL_P(param_val);
+			result = gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
+						param_name, G_TYPE_DOUBLE, target_gdouble, NULL, NULL);
+			break; 
+		case IS_STRING: 
+			target_gchar = (gchar *)Z_LVAL_P(param_val);
+			result = gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
+						param_name, G_TYPE_STRING, target_gchar, NULL, NULL);
+			break; 
+		default: 
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' is an invalid type");
+			break; 
+	}
+	
+	if (result) {
+		RETURN_TRUE;
 	} else {
 		if (error != NULL) {
-			printf(stderr, "Unable send action: %s\n", error->message);
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable send action: %s", error->message);
 			g_error_free (error);
 		}
-		
-		RETURN_TRUE;
+		RETURN_FALSE;
 	}
 }
 /* }}} */
