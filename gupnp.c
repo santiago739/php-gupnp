@@ -202,6 +202,12 @@ PHP_MINIT_FUNCTION(gupnp)
 	REGISTER_INI_ENTRIES();
 	*/
 	
+	REGISTER_LONG_CONSTANT("GUPNP_TYPE_BOOLEAN", G_TYPE_BOOLEAN,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_TYPE_LONG", G_TYPE_LONG,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_TYPE_DOUBLE", G_TYPE_DOUBLE,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_TYPE_STRING", G_TYPE_STRING,  CONST_CS | CONST_PERSISTENT);
+	
+	
 	le_cpoint = zend_register_list_destructors_ex(_php_gupnp_cpoint_dtor, NULL, "control point", module_number);
 	le_proxy = zend_register_list_destructors_ex(_php_gupnp_proxy_dtor, NULL, "proxy", module_number);
 	
@@ -392,6 +398,7 @@ PHP_FUNCTION(gupnp_service_proxy_send_action)
 	zval *zproxy, *param_val;
 	char *action, *param_name;
 	int action_len, param_name_len;
+	long param_type;
 	php_gupnp_service_proxy_t *sproxy;
 	GError *error = NULL;
 	
@@ -400,39 +407,44 @@ PHP_FUNCTION(gupnp_service_proxy_send_action)
 	gdouble target_gdouble = 0;
 	gchar *target_gchar = NULL;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rssz", 
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rsszl", 
 			&zproxy, &action, &action_len, &param_name, &param_name_len, 
-			&param_val) == FAILURE) {
+			&param_val, &param_type) == FAILURE) {
 		return;
 	}
 	
-	ZEND_FETCH_RESOURCE(sproxy, php_gupnp_service_proxy_t *, &zproxy, -1, "proxy", le_proxy)
+	ZEND_FETCH_RESOURCE(sproxy, php_gupnp_service_proxy_t *, &zproxy, -1, "proxy", le_proxy);
 	
-	switch (Z_TYPE_P(param_val)) {         
-		case IS_BOOL: 
+	switch (param_type) {         
+		case G_TYPE_BOOLEAN: 
 			if (Z_BVAL_P(param_val)) {
 				target_gbool = 1;
             } 
 			result = gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
 						param_name, G_TYPE_BOOLEAN, target_gbool, NULL, NULL);
 			break; 
-		case IS_LONG: 
+		case G_TYPE_LONG: 
 			target_glong = (glong)Z_LVAL_P(param_val);
 			result = gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
 						param_name, G_TYPE_LONG, target_glong, NULL, NULL);
 			break; 
-		case IS_DOUBLE: 
+		case G_TYPE_DOUBLE: 
 			target_gdouble = (gdouble)Z_LVAL_P(param_val);
 			result = gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
 						param_name, G_TYPE_DOUBLE, target_gdouble, NULL, NULL);
 			break; 
-		case IS_STRING: 
-			target_gchar = (gchar *)Z_LVAL_P(param_val);
-			result = gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
-						param_name, G_TYPE_STRING, target_gchar, NULL, NULL);
+		case G_TYPE_STRING: 
+			if (Z_TYPE_P(param_val) == IS_STRING) {
+				target_gchar = (gchar *)Z_LVAL_P(param_val);
+				result = gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
+							param_name, G_TYPE_STRING, target_gchar, NULL, NULL);
+			} else {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' must be string");
+			}
+				
 			break; 
 		default: 
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' is an invalid type");
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_type' is not correctly defined");
 			break; 
 	}
 	
