@@ -61,8 +61,8 @@ function service_cb($proxy, $arg)
 	echo "---------------------------------------------------------\n\n";
 }
 
-var_dump(GUPNP_TYPE_BOOLEAN);
-var_dump(GUPNP_TYPE_LONG);
+$context = gupnp_context_new();
+var_dump($context);
 
 //$target = "urn:schemas-upnp-org:service:tvcontrol:1";
 $target = "urn:schemas-upnp-org:service:SwitchPower:1";
@@ -72,7 +72,7 @@ $arg = "data";
 echo "=========================================================\n";
 echo "[CALL]: gupnp_control_point_new() \n";
 echo "---------------------------------------------------------\n";
-$cp = gupnp_control_point_new($target);
+$cp = gupnp_control_point_new($context, $target);
 echo "[RESULT]: ";
 var_dump($cp);
 echo "=========================================================\n\n\n";

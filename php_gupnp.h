@@ -43,6 +43,7 @@ PHP_RINIT_FUNCTION(gupnp);
 PHP_RSHUTDOWN_FUNCTION(gupnp);
 PHP_MINFO_FUNCTION(gupnp);
 
+PHP_FUNCTION(gupnp_context_new);
 PHP_FUNCTION(gupnp_control_point_new);
 PHP_FUNCTION(gupnp_browse_service);
 PHP_FUNCTION(gupnp_service_info_get);

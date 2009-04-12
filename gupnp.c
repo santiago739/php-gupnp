@@ -51,7 +51,14 @@ typedef struct _php_gupnp_service_proxy_t { /* {{{ */
 } php_gupnp_service_proxy_t;
 /* }}} */
 
+typedef struct _php_gupnp_context_t { /* {{{ */
+	GUPnPContext *context;
+	int rsrc_id;
+} php_gupnp_context_t;
+/* }}} */
+
 /* True global resources - no need for thread safety here */
+static int le_context;
 static int le_cpoint;
 static int le_proxy;
 
@@ -60,6 +67,7 @@ static int le_proxy;
  * Every user visible function must have an entry in gupnp_functions[].
  */
 zend_function_entry gupnp_functions[] = {
+	PHP_FE(gupnp_context_new,	NULL)
 	PHP_FE(gupnp_control_point_new,	NULL)
 	PHP_FE(gupnp_browse_service, 	NULL)
 	PHP_FE(gupnp_service_info_get, 	NULL)
@@ -134,13 +142,7 @@ static void _php_gupnp_cpoint_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ 
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)rsrc->ptr;
 	
 	_php_gupnp_cpoint_callback_free(cpoint->callback);
-	
-	/*if (cpoint->proxy_id >= 0) {
-		zend_list_delete(cpoint->proxy_id);
-	}*/
-	
 	g_object_unref(cpoint->cp);
-
 	efree(cpoint);
 }
 /* }}} */
@@ -152,6 +154,17 @@ static void _php_gupnp_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ *
 	php_gupnp_service_proxy_t *sproxy = (php_gupnp_service_proxy_t *)rsrc->ptr;
 	
 	efree(sproxy);
+}
+/* }}} */
+
+/* {{{ _php_gupnp_proxy_dtor
+ */
+static void _php_gupnp_context_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
+{
+	php_gupnp_context_t *context = (php_gupnp_context_t *)rsrc->ptr;
+	
+	g_object_unref(context->context);
+	efree(context);
 }
 /* }}} */
 
@@ -207,7 +220,7 @@ PHP_MINIT_FUNCTION(gupnp)
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_DOUBLE", G_TYPE_DOUBLE,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_STRING", G_TYPE_STRING,  CONST_CS | CONST_PERSISTENT);
 	
-	
+	le_context = zend_register_list_destructors_ex(_php_gupnp_context_dtor, NULL, "context", module_number);
 	le_cpoint = zend_register_list_destructors_ex(_php_gupnp_cpoint_dtor, NULL, "control point", module_number);
 	le_proxy = zend_register_list_destructors_ex(_php_gupnp_proxy_dtor, NULL, "proxy", module_number);
 	
@@ -215,7 +228,7 @@ PHP_MINIT_FUNCTION(gupnp)
 	g_thread_init(NULL);
 	g_type_init();
 	
-	GUPNP_G(context) = gupnp_context_new(NULL, NULL, 0, NULL);
+	//GUPNP_G(context) = gupnp_context_new(NULL, NULL, 0, NULL);
 	
 	return SUCCESS;
 }
@@ -234,9 +247,9 @@ PHP_MSHUTDOWN_FUNCTION(gupnp)
 		g_main_loop_unref(GUPNP_G(main_loop));
 		
 	}
-	if (GUPNP_G(context)) {
+	/*if (GUPNP_G(context)) {
 		g_object_unref(GUPNP_G(context));
-	}
+	}*/
 	
 	
 	return SUCCESS;
@@ -277,18 +290,54 @@ PHP_MINFO_FUNCTION(gupnp)
 
 /* {{{ proto resource gupnp_control_point_new(string target)
    Create a new Control point with the specified target */
+PHP_FUNCTION(gupnp_context_new)
+{
+	char *host_ip = NULL;
+	int host_ip_len;
+	long port = 0;
+	GError *error = NULL;
+	php_gupnp_context_t *context = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|sl", &host_ip, &host_ip_len, &port) == FAILURE) {
+		return;
+	}
+	
+	context = emalloc(sizeof(php_gupnp_context_t));
+	context->context = gupnp_context_new(NULL, host_ip, port, &error);
+	
+	if (context->context == NULL) {
+		if (error != NULL) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable create context: %s", error->message);
+			g_error_free (error);
+		}
+		efree(context);	
+		RETURN_FALSE;
+	}
+	context->rsrc_id = zend_list_insert(context, le_context);
+	
+	RETURN_RESOURCE(context->rsrc_id);
+}
+/* }}} */
+
+/* {{{ proto resource gupnp_control_point_new(string target)
+   Create a new Control point with the specified target */
 PHP_FUNCTION(gupnp_control_point_new)
 {
 	char *target = NULL;
 	int target_len;
+	zval *zcontext;
 	php_gupnp_cpoint_t *cpoint = NULL;
+	php_gupnp_context_t *context = NULL;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &target, &target_len) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &zcontext, &target, &target_len) == FAILURE) {
 		return;
 	}
 	
+	ZEND_FETCH_RESOURCE(context, php_gupnp_context_t *, &zcontext, -1, "context", le_context);
+	
 	cpoint = emalloc(sizeof(php_gupnp_cpoint_t));
-	cpoint->cp = gupnp_control_point_new(GUPNP_G(context), target);
+	//cpoint->cp = gupnp_control_point_new(GUPNP_G(context), target);
+	cpoint->cp = gupnp_control_point_new(context->context, target);
 	cpoint->callback = NULL;
 	TSRMLS_SET_CTX(cpoint->thread_ctx);
 	cpoint->rsrc_id = zend_list_insert(cpoint, le_cpoint);
@@ -311,7 +360,7 @@ PHP_FUNCTION(gupnp_browse_service)
 		return;
 	}
 	
-	ZEND_FETCH_RESOURCE(cpoint, php_gupnp_cpoint_t *, &zcpoint, -1, "control point", le_cpoint)
+	ZEND_FETCH_RESOURCE(cpoint, php_gupnp_cpoint_t *, &zcpoint, -1, "control point", le_cpoint);
 	
 	if (!zend_is_callable(zcallback, 0, &func_name TSRMLS_CC)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
@@ -366,7 +415,7 @@ PHP_FUNCTION(gupnp_service_info_get)
 		return;
 	}
 	
-	ZEND_FETCH_RESOURCE(sproxy, php_gupnp_service_proxy_t *, &zproxy, -1, "proxy", le_proxy)
+	ZEND_FETCH_RESOURCE(sproxy, php_gupnp_service_proxy_t *, &zproxy, -1, "proxy", le_proxy);
 	
 	id = gupnp_service_info_get_id(GUPNP_SERVICE_INFO(sproxy->proxy));
 	scpd_url = gupnp_service_info_get_scpd_url(GUPNP_SERVICE_INFO(sproxy->proxy));
