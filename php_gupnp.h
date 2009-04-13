@@ -35,7 +35,6 @@ extern zend_module_entry gupnp_module_entry;
 #endif
 
 #include <libgupnp/gupnp.h>
-//#include "gupnp.h"
 
 PHP_MINIT_FUNCTION(gupnp);
 PHP_MSHUTDOWN_FUNCTION(gupnp);
@@ -44,10 +43,17 @@ PHP_RSHUTDOWN_FUNCTION(gupnp);
 PHP_MINFO_FUNCTION(gupnp);
 
 PHP_FUNCTION(gupnp_context_new);
+PHP_FUNCTION(gupnp_context_get_host_ip);
+PHP_FUNCTION(gupnp_context_get_port);
+PHP_FUNCTION(gupnp_context_set_subscription_timeout);
+PHP_FUNCTION(gupnp_context_get_subscription_timeout);
 PHP_FUNCTION(gupnp_control_point_new);
 PHP_FUNCTION(gupnp_browse_service);
 PHP_FUNCTION(gupnp_service_info_get);
 PHP_FUNCTION(gupnp_service_proxy_send_action);
+PHP_FUNCTION(gupnp_service_proxy_set_subscribed);
+PHP_FUNCTION(gupnp_service_proxy_get_subscribed);
+PHP_FUNCTION(gupnp_service_proxy_add_notify);
 
 ZEND_BEGIN_MODULE_GLOBALS(gupnp)
 	GMainLoop *main_loop;

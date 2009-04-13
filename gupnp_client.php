@@ -59,10 +59,92 @@ function service_cb($proxy, $arg)
 	echo "[RESULT]: ";
 	var_dump($res);
 	echo "---------------------------------------------------------\n\n";
+	
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_proxy_get_subscribed() \n";
+	echo "---------------------------------------------------------\n";
+	$res = gupnp_service_proxy_get_subscribed($proxy);
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_proxy_set_subscribed() \n";
+	echo "---------------------------------------------------------\n";
+	gupnp_service_proxy_set_subscribed($proxy, true);
+	echo "---------------------------------------------------------\n\n";
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_proxy_get_subscribed() \n";
+	echo "---------------------------------------------------------\n";
+	$res = gupnp_service_proxy_get_subscribed($proxy);
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_proxy_add_notify() \n";
+	echo "---------------------------------------------------------\n";
+	$cb = "notify_cb";
+	$arg = "notify data";
+	$res = gupnp_service_proxy_add_notify($proxy, "Target", GUPNP_TYPE_BOOLEAN, $cb, $arg);
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
 }
 
+function notify_cb($arg)
+{
+	echo "[CALLED] notify_cb()\n";
+}
+
+echo "=========================================================\n";
+echo "[CALL]: gupnp_control_point_new() \n";
+echo "---------------------------------------------------------\n";
 $context = gupnp_context_new();
+echo "[RESULT]: ";
 var_dump($context);
+echo "=========================================================\n\n\n";
+
+echo "=========================================================\n";
+echo "[CALL]: gupnp_context_get_host_ip() \n";
+echo "---------------------------------------------------------\n";
+$host_ip = gupnp_context_get_host_ip($context);
+echo "[RESULT]: ";
+var_dump($host_ip);
+echo "=========================================================\n\n\n";
+
+echo "=========================================================\n";
+echo "[CALL]: gupnp_context_get_port() \n";
+echo "---------------------------------------------------------\n";
+$port = gupnp_context_get_port($context);
+echo "[RESULT]: ";
+var_dump($port);
+echo "=========================================================\n\n\n";
+
+echo "=========================================================\n";
+echo "[CALL]: gupnp_context_get_subscription_timeout() \n";
+echo "---------------------------------------------------------\n";
+$timeout = gupnp_context_get_subscription_timeout($context);
+echo "[RESULT]: ";
+var_dump($timeout);
+echo "=========================================================\n\n\n";
+
+echo "=========================================================\n";
+echo "[CALL]: gupnp_context_set_subscription_timeout() \n";
+echo "---------------------------------------------------------\n";
+$timeout = 100;
+gupnp_context_set_subscription_timeout($context, $timeout);
+echo "[RESULT]: set timeout to $timeout \n";
+echo "=========================================================\n\n\n";
+
+echo "=========================================================\n";
+echo "[CALL]: gupnp_context_get_subscription_timeout() \n";
+echo "---------------------------------------------------------\n";
+$timeout = gupnp_context_get_subscription_timeout($context);
+echo "[RESULT]: ";
+var_dump($timeout);
+echo "=========================================================\n\n\n";
 
 //$target = "urn:schemas-upnp-org:service:tvcontrol:1";
 $target = "urn:schemas-upnp-org:service:SwitchPower:1";
