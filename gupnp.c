@@ -90,6 +90,7 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_service_proxy_set_subscribed, 	NULL)
 	PHP_FE(gupnp_service_proxy_get_subscribed, 	NULL)
 	PHP_FE(gupnp_service_proxy_add_notify, 	NULL)
+	PHP_FE(gupnp_service_proxy_remove_notify, 	NULL)
 	{NULL, NULL, NULL}	/* Must be the last line in gupnp_functions[] */
 };
 /* }}} */
@@ -361,8 +362,8 @@ PHP_MINFO_FUNCTION(gupnp)
 }
 /* }}} */
 
-/* {{{ proto resource gupnp_control_point_new(string target)
-   Create a new Control point with the specified target */
+/* {{{ proto resource gupnp_context_new([string host_ip[, int port]])
+   Create a new context with the specified host_ip and port. */
 PHP_FUNCTION(gupnp_context_new)
 {
 	char *host_ip = NULL;
@@ -380,8 +381,8 @@ PHP_FUNCTION(gupnp_context_new)
 	
 	if (context->context == NULL) {
 		if (error != NULL) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable create context: %s", error->message);
-			g_error_free (error);
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to create context: %s", error->message);
+			g_error_free(error);
 		}
 		efree(context);	
 		RETURN_FALSE;
@@ -408,7 +409,7 @@ PHP_FUNCTION(gupnp_context_get_host_ip)
 }
 /* }}} */
 
-/* {{{ proto string gupnp_context_get_port(resource context)
+/* {{{ proto int gupnp_context_get_port(resource context)
    Get the port that the SOAP server is running on. */
 PHP_FUNCTION(gupnp_context_get_port)
 {
@@ -424,7 +425,7 @@ PHP_FUNCTION(gupnp_context_get_port)
 }
 /* }}} */
 
-/* {{{ proto string gupnp_context_set_subscription_timeout(resource context, long timeout)
+/* {{{ proto void gupnp_context_set_subscription_timeout(resource context, int timeout)
    Sets the event subscription timeout to timeout. 
    Use 0 if you don't want subscriptions to time out. 
    Note that any client side subscriptions will automatically be renewed. */
@@ -443,7 +444,7 @@ PHP_FUNCTION(gupnp_context_set_subscription_timeout)
 }
 /* }}} */
 
-/* {{{ proto long gupnp_context_get_subscription_timeout(resource context)
+/* {{{ proto int gupnp_context_get_subscription_timeout(resource context)
    Get the event subscription timeout (in seconds), or 0 meaning there is no timeout. */
 PHP_FUNCTION(gupnp_context_get_subscription_timeout)
 {
@@ -459,7 +460,7 @@ PHP_FUNCTION(gupnp_context_get_subscription_timeout)
 }
 /* }}} */
 
-/* {{{ proto resource gupnp_control_point_new(string target)
+/* {{{ proto resource gupnp_control_point_new(resource context, string target)
    Create a new Control point with the specified target */
 PHP_FUNCTION(gupnp_control_point_new)
 {
@@ -485,8 +486,8 @@ PHP_FUNCTION(gupnp_control_point_new)
 }
 /* }}} */
 
-/* {{{ proto string confirm_gupnp_compiled(string arg)
-   Return a string to confirm that the module is compiled in */
+/* {{{ proto bool gupnp_browse_service(resource cpoint, mixed callback[, mixed arg])
+   Starts the search and calls user-defined callback. */
 PHP_FUNCTION(gupnp_browse_service)
 {
 	zval *zcpoint, *zcallback, *zarg = NULL;
@@ -528,7 +529,7 @@ PHP_FUNCTION(gupnp_browse_service)
 	gssdp_resource_browser_set_active(GSSDP_RESOURCE_BROWSER(cpoint->cp), TRUE);
   
 	/* Enter the main loop. This will start the search and result in callbacks to
-	   gupnp_service_proxy_available_cb. */
+	   _php_gupnp_service_proxy_available_cb. */
 	GUPNP_G(main_loop) = g_main_loop_new(NULL, FALSE);
 	g_main_loop_run(GUPNP_G(main_loop));
 	
@@ -553,7 +554,6 @@ PHP_FUNCTION(gupnp_service_info_get)
 		return;
 	}
 	
-	//ZEND_FETCH_RESOURCE(sproxy, php_gupnp_service_proxy_t *, &zproxy, -1, "proxy", le_proxy);
 	ZVAL_TO_PROXY(zproxy, sproxy);
 	
 	id = gupnp_service_info_get_id(GUPNP_SERVICE_INFO(sproxy->proxy));
@@ -579,7 +579,7 @@ PHP_FUNCTION(gupnp_service_info_get)
 }
 /* }}} */
 
-/* {{{ proto boolean gupnp_service_proxy_send_action(resource proxy, string action, string param_name, zval param_val)
+/* {{{ proto bool gupnp_service_proxy_send_action(resource proxy, string action, string name, mixed value, int type)
    Sends action with parameters to the service exposed by proxy synchronously. */
 PHP_FUNCTION(gupnp_service_proxy_send_action)
 {
@@ -671,7 +671,7 @@ PHP_FUNCTION(gupnp_service_proxy_set_subscribed)
 }
 /* }}} */
 
-/* {{{ proto boolean gupnp_service_proxy_get_subscribed(resource proxy)
+/* {{{ proto bool gupnp_service_proxy_get_subscribed(resource proxy)
    Returns true if we are subscribed to this service. */
 PHP_FUNCTION(gupnp_service_proxy_get_subscribed)
 {
@@ -691,8 +691,8 @@ PHP_FUNCTION(gupnp_service_proxy_get_subscribed)
 }
 /* }}} */
 
-/* {{{ proto boolean gupnp_service_proxy_get_subscribed(resource proxy)
-   Returns true if we are subscribed to this service. */
+/* {{{ proto bool gupnp_service_proxy_add_notify(resource proxy, string value, int type, mixed callback[, mixed arg])
+   Sets up callback to be called whenever a change notification for variable is recieved. */
 PHP_FUNCTION(gupnp_service_proxy_add_notify)
 {
 	zval *zproxy, *zcallback, *zarg = NULL;
@@ -736,6 +736,28 @@ PHP_FUNCTION(gupnp_service_proxy_add_notify)
 	}
 	
 	if (!gupnp_service_proxy_add_notify(sproxy->proxy, param_val, param_type, _php_gupnp_service_proxy_notify_cb, sproxy)) {
+    	RETURN_FALSE;
+	}
+	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_service_proxy_remove_notify(resource proxy, string value)
+   Cancels the variable change notification. */
+PHP_FUNCTION(gupnp_service_proxy_remove_notify)
+{
+	zval *zproxy;
+	char *param_val;
+	int param_val_len;
+	php_gupnp_service_proxy_t *sproxy;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &zproxy, &param_val, &param_val_len) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_PROXY(zproxy, sproxy);
+		
+	if (!gupnp_service_proxy_remove_notify(sproxy->proxy, param_val, _php_gupnp_service_proxy_notify_cb, sproxy)) {
     	RETURN_FALSE;
 	}
 	RETURN_TRUE;

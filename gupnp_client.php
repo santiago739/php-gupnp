@@ -67,8 +67,18 @@ function service_cb($proxy, $arg)
 	echo "[CALL]: gupnp_service_proxy_add_notify() \n";
 	echo "---------------------------------------------------------\n";
 	$cb = "notify_cb";
-	$arg = "notify data";
+	$arg = "notify data, channel";
 	$res = gupnp_service_proxy_add_notify($proxy, "Channel", GUPNP_TYPE_LONG, $cb, $arg);
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_proxy_add_notify() \n";
+	echo "---------------------------------------------------------\n";
+	$cb = "notify_cb";
+	$arg = "notify data, power";
+	$res = gupnp_service_proxy_add_notify($proxy, "Power", GUPNP_TYPE_BOOLEAN, $cb, $arg);
 	echo "[RESULT]: ";
 	var_dump($res);
 	echo "---------------------------------------------------------\n\n";
@@ -100,13 +110,32 @@ function service_cb($proxy, $arg)
 
 function notify_cb($variable, $value, $arg)
 {
-	echo "[CALLED] notify_cb()\n";
+	echo "=========================================================\n";
+	echo "[CALL] notify_cb()\n";
+	echo "---------------------------------------------------------\n";
+
 	echo "[VARIABLE]: ";
 	var_dump($variable);
 	echo "[VALUE]: ";
 	var_dump($value);
 	echo "[ARG]: ";
 	var_dump($arg);
+	echo "=========================================================\n\n\n";
+}
+
+function remove_notify_cb($variable, $value, $arg)
+{
+	echo "=========================================================\n";
+	echo "[CALL] notify_cb()\n";
+	echo "---------------------------------------------------------\n";
+
+	echo "[VARIABLE]: ";
+	var_dump($variable);
+	echo "[VALUE]: ";
+	var_dump($value);
+	echo "[ARG]: ";
+	var_dump($arg);
+	echo "=========================================================\n\n\n";
 }
 
 echo "=========================================================\n";
@@ -194,6 +223,14 @@ while(1)
 	var_dump($res);
 
 	sleep(5);
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_proxy_remove_notify() \n";
+	echo "---------------------------------------------------------\n";
+	$res = gupnp_service_proxy_remove_notify($proxy1, "Channel");
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
 }
 
 ?>
