@@ -57,7 +57,6 @@ PHP_FUNCTION(gupnp_service_proxy_add_notify);
 
 ZEND_BEGIN_MODULE_GLOBALS(gupnp)
 	GMainLoop *main_loop;
-	GUPnPContext *context;
 ZEND_END_MODULE_GLOBALS(gupnp)
 
 /* In every utility function you add that needs to use variables 

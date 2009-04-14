@@ -48,6 +48,10 @@ typedef struct _php_gupnp_cpoint_t { /* {{{ */
 typedef struct _php_gupnp_service_proxy_t { /* {{{ */
 	GUPnPServiceProxy *proxy;
 	int rsrc_id;
+	php_gupnp_callback_t *callback;
+#ifdef ZTS
+	void ***thread_ctx;
+#endif
 } php_gupnp_service_proxy_t;
 /* }}} */
 
@@ -129,7 +133,6 @@ PHP_INI_END()
 static void php_gupnp_init_globals(zend_gupnp_globals *gupnp_globals)
 {
 	gupnp_globals->main_loop = NULL;
-	gupnp_globals->context = NULL;
 }
 /* }}} */
 
@@ -167,6 +170,7 @@ static void _php_gupnp_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ *
 {
 	php_gupnp_service_proxy_t *sproxy = (php_gupnp_service_proxy_t *)rsrc->ptr;
 	
+	_php_gupnp_callback_free(sproxy->callback);
 	efree(sproxy);
 }
 /* }}} */
@@ -199,6 +203,8 @@ static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPSe
 	
 	sproxy = emalloc(sizeof(php_gupnp_service_proxy_t));
 	sproxy->proxy = proxy;
+	sproxy->callback = NULL;
+	TSRMLS_SET_CTX(sproxy->thread_ctx);
 	sproxy->rsrc_id = zend_list_insert(sproxy, le_proxy);
 	
 	MAKE_STD_ZVAL(args[0]);
@@ -225,40 +231,50 @@ static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPSe
  */
 static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const char *variable, GValue *value, gpointer userdata)
 {
-	printf("Value changed: %s\n", g_value_get_string(value));
+	printf("Value changed, value_type: %s \n", G_VALUE_TYPE_NAME(value));
 	
-	/*
-	zval *args[2];
-	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
+	zval *args[3];
+	php_gupnp_service_proxy_t *sproxy = (php_gupnp_service_proxy_t *)userdata;
 	php_gupnp_callback_t *callback;
-	php_gupnp_service_proxy_t *sproxy;
 	zval retval;
-	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
+	TSRMLS_FETCH_FROM_CTX(sproxy ? sproxy->thread_ctx : NULL);
 	
-	if (!cpoint || !cpoint->callback) {
+	if (!sproxy || !sproxy->callback) {
 		return;
 	}
 	
-	sproxy = emalloc(sizeof(php_gupnp_service_proxy_t));
-	sproxy->proxy = proxy;
-	sproxy->rsrc_id = zend_list_insert(sproxy, le_proxy);
-	
 	MAKE_STD_ZVAL(args[0]);
-	ZVAL_RESOURCE(args[0], sproxy->rsrc_id);
-	zend_list_addref(sproxy->rsrc_id);
+	ZVAL_STRING(args[0], (char *)variable, 1); 
 	
-	callback = cpoint->callback;
-	args[1] = callback->arg;
-	args[1]->refcount++;
+	MAKE_STD_ZVAL(args[1]);
+	switch (G_VALUE_TYPE(value)) {
+		case G_TYPE_BOOLEAN: 
+			ZVAL_BOOL(args[1], g_value_get_boolean(value));
+			break; 
+		case G_TYPE_LONG: 
+			ZVAL_LONG(args[1], g_value_get_long(value));
+			break; 
+		case G_TYPE_DOUBLE:
+			ZVAL_DOUBLE(args[1], g_value_get_double(value));
+			break; 
+		case G_TYPE_STRING: 
+			ZVAL_STRING(args[1], (char *)g_value_get_string(value), 1);
+			break; 
+		default: 
+			ZVAL_NULL(args[1]);
+			break; 
+	}
 	
-	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 2, args TSRMLS_CC) == SUCCESS) {
+	callback = sproxy->callback;
+	args[2] = callback->arg;
+	args[2]->refcount++;
+	
+	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 3, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
 	}
 	zval_ptr_dtor(&(args[0]));
 	zval_ptr_dtor(&(args[1]));
-	
-	g_main_loop_quit(GUPNP_G(main_loop));
-	*/
+	zval_ptr_dtor(&(args[2]));
 	
 	return;
 }
@@ -484,7 +500,7 @@ PHP_FUNCTION(gupnp_browse_service)
 	
 	ZEND_FETCH_RESOURCE(cpoint, php_gupnp_cpoint_t *, &zcpoint, -1, "control point", le_cpoint);
 	
-	if (!zend_is_callable(zcallback, 0, &func_name TSRMLS_CC)) {
+	if (!zend_is_callable(zcallback, 0, &func_name)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
 		efree(func_name);
 		RETURN_FALSE;
@@ -587,7 +603,7 @@ PHP_FUNCTION(gupnp_service_proxy_send_action)
 	
 	ZVAL_TO_PROXY(zproxy, sproxy);
 	
-	switch (param_type) {         
+	switch (param_type) {
 		case G_TYPE_BOOLEAN: 
 			if (Z_BVAL_P(param_val)) {
 				target_gbool = 1;
@@ -692,36 +708,34 @@ PHP_FUNCTION(gupnp_service_proxy_add_notify)
 	
 	ZVAL_TO_PROXY(zproxy, sproxy);
 		
-	if (!zend_is_callable(zcallback, 0, &func_name TSRMLS_CC)) {
+	if (!zend_is_callable(zcallback, 0, &func_name)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
 		efree(func_name);
 		RETURN_FALSE;
 	}
 	efree(func_name);
 	
-	/*
+	
 	zval_add_ref(&zcallback);
 	if (zarg) {
 		zval_add_ref(&zarg);
 	} else {
 		ALLOC_INIT_ZVAL(zarg);
 	}
-	*/
 	
-	/*
+	
 	callback = emalloc(sizeof(php_gupnp_callback_t));
 	callback->func = zcallback;
 	callback->arg = zarg;
 	
-	old_callback = cpoint->callback;
-	cpoint->callback = callback;
+	old_callback = sproxy->callback;
+	sproxy->callback = callback;
 	
 	if (old_callback) {
 		_php_gupnp_callback_free(old_callback);
 	}
-	*/
 	
-	if (!gupnp_service_proxy_add_notify(sproxy->proxy, param_val, G_TYPE_STRING, _php_gupnp_service_proxy_notify_cb, NULL)) {
+	if (!gupnp_service_proxy_add_notify(sproxy->proxy, param_val, param_type, _php_gupnp_service_proxy_notify_cb, sproxy)) {
     	RETURN_FALSE;
 	}
 	RETURN_TRUE;
