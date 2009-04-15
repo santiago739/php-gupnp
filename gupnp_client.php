@@ -26,41 +26,44 @@ function service_cb($proxy, $arg)
 	echo "---------------------------------------------------------\n\n";
 	
 	echo "---------------------------------------------------------\n";
-	echo "[CALL]: gupnp_service_proxy_send_action() \n";
+	echo "[CALL]: gupnp_service_proxy_action_set() \n";
 	echo "---------------------------------------------------------\n";
-	$res = gupnp_service_proxy_send_action($proxy, "SetChannel", "Channel", rand(1, 100), GUPNP_TYPE_LONG);
+	$res = gupnp_service_proxy_action_set($proxy, "SetChannel", "Channel", rand(1, 100), GUPNP_TYPE_LONG);
 	echo "[RESULT]: ";
 	var_dump($res);
 	
-/*
-	$res = gupnp_service_proxy_send_action($proxy, "SetTarget", "NewTargetValue", false, GUPNP_TYPE_BOOLEAN);
+	$res = gupnp_service_proxy_action_set($proxy, "GetStatus", "ResultStatus", false, GUPNP_TYPE_BOOLEAN, GUPNP_ACTION_GET);
 	echo "[RESULT]: ";
 	var_dump($res);
-	$res = gupnp_service_proxy_send_action($proxy, "SetTarget", "NewTargetValue", 1, GUPNP_TYPE_LONG);
+
+	$res = gupnp_service_proxy_action_set($proxy, "SetTarget", "NewTargetValue", false, GUPNP_TYPE_BOOLEAN);
 	echo "[RESULT]: ";
 	var_dump($res);
-	$res = gupnp_service_proxy_send_action($proxy, "SetTarget", "NewTargetValue", 0, GUPNP_TYPE_LONG);
+	$res = gupnp_service_proxy_action_set($proxy, "SetTarget", "NewTargetValue", 1, GUPNP_TYPE_LONG);
 	echo "[RESULT]: ";
 	var_dump($res);
-	$res = gupnp_service_proxy_send_action($proxy, "SetTarget", "NewTargetValue", 1.1, GUPNP_TYPE_DOUBLE);
+	$res = gupnp_service_proxy_action_set($proxy, "SetTarget", "NewTargetValue", 0, GUPNP_TYPE_LONG);
 	echo "[RESULT]: ";
 	var_dump($res);
-	$res = gupnp_service_proxy_send_action($proxy, "SetTarget", "NewTargetValue", 0.0, GUPNP_TYPE_DOUBLE);
+	$res = gupnp_service_proxy_action_set($proxy, "SetTarget", "NewTargetValue", 1.1, GUPNP_TYPE_DOUBLE);
 	echo "[RESULT]: ";
 	var_dump($res);
-	$res = gupnp_service_proxy_send_action($proxy, "SetTarget", "NewTargetValue", "2", GUPNP_TYPE_STRING);
+	$res = gupnp_service_proxy_action_set($proxy, "SetTarget", "NewTargetValue", 0.0, GUPNP_TYPE_DOUBLE);
 	echo "[RESULT]: ";
 	var_dump($res);
-	$res = gupnp_service_proxy_send_action($proxy, "SetTarget", "NewTargetValue", "0", GUPNP_TYPE_STRING);
+	$res = gupnp_service_proxy_action_set($proxy, "SetTarget", "NewTargetValue", "2", GUPNP_TYPE_STRING);
 	echo "[RESULT]: ";
 	var_dump($res);
-	$res = gupnp_service_proxy_send_action($proxy, "SetTarget", "NewTargetValue", $proxy, GUPNP_TYPE_STRING);
+	$res = gupnp_service_proxy_action_set($proxy, "SetTarget", "NewTargetValue", "0", GUPNP_TYPE_STRING);
 	echo "[RESULT]: ";
 	var_dump($res);
-	$res = gupnp_service_proxy_send_action($proxy, "SetTarget2", "NewTargetValue", true, GUPNP_TYPE_BOOLEAN);
+	$res = gupnp_service_proxy_action_set($proxy, "SetTarget", "NewTargetValue", $proxy, GUPNP_TYPE_STRING);
 	echo "[RESULT]: ";
 	var_dump($res);
-*/
+	$res = gupnp_service_proxy_action_set($proxy, "SetTarget2", "NewTargetValue", true, GUPNP_TYPE_BOOLEAN);
+	echo "[RESULT]: ";
+	var_dump($res);
+
 	echo "---------------------------------------------------------\n\n";
 	
 	echo "---------------------------------------------------------\n";
@@ -186,8 +189,8 @@ echo "[RESULT]: ";
 var_dump($timeout);
 echo "=========================================================\n\n\n";
 
-$target = "urn:schemas-upnp-org:service:tvcontrol:1";
-//$target = "urn:schemas-upnp-org:service:SwitchPower:1";
+//$target = "urn:schemas-upnp-org:service:tvcontrol:1";
+$target = "urn:schemas-upnp-org:service:SwitchPower:1";
 $cb = "service_cb";
 $arg = "data";
 
@@ -210,15 +213,15 @@ echo "=========================================================\n\n\n";
 //$location = gupnp_service_info_get($proxy1);
 //var_dump($location);
 
-//$res = gupnp_service_proxy_send_action($proxy1, "SetTarget", "NewTargetValue", "0");
+//$res = gupnp_service_proxy_action_set($proxy1, "SetTarget", "NewTargetValue", "0");
 //var_dump($res);
 
 while(1)
 {
 	echo "---------------------------------------------------------\n";
-	echo "[CALL]: gupnp_service_proxy_send_action() \n";
+	echo "[CALL]: gupnp_service_proxy_action_set() \n";
 	echo "---------------------------------------------------------\n";
-	$res = gupnp_service_proxy_send_action($proxy1, "SetChannel", "Channel", rand(1, 100), GUPNP_TYPE_LONG);
+	$res = gupnp_service_proxy_action_set($proxy1, "SetChannel", "Channel", rand(1, 100), GUPNP_TYPE_LONG);
 	echo "[RESULT]: ";
 	var_dump($res);
 

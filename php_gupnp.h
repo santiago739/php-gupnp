@@ -50,7 +50,8 @@ PHP_FUNCTION(gupnp_context_get_subscription_timeout);
 PHP_FUNCTION(gupnp_control_point_new);
 PHP_FUNCTION(gupnp_browse_service);
 PHP_FUNCTION(gupnp_service_info_get);
-PHP_FUNCTION(gupnp_service_proxy_send_action);
+PHP_FUNCTION(gupnp_service_proxy_action_set);
+PHP_FUNCTION(gupnp_service_proxy_action_get);
 PHP_FUNCTION(gupnp_service_proxy_set_subscribed);
 PHP_FUNCTION(gupnp_service_proxy_get_subscribed);
 PHP_FUNCTION(gupnp_service_proxy_add_notify);
@@ -59,6 +60,9 @@ PHP_FUNCTION(gupnp_service_proxy_remove_notify);
 ZEND_BEGIN_MODULE_GLOBALS(gupnp)
 	GMainLoop *main_loop;
 ZEND_END_MODULE_GLOBALS(gupnp)
+
+#define GUPNP_ACTION_SET 0
+#define GUPNP_ACTION_GET 1
 
 /* In every utility function you add that needs to use variables 
    in php_gupnp_globals, call TSRMLS_FETCH(); after declaring other 
