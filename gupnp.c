@@ -39,6 +39,7 @@ typedef struct _php_gupnp_cpoint_t { /* {{{ */
 	GUPnPControlPoint *cp;
 	int rsrc_id;
 	php_gupnp_callback_t *callback;
+	GMainLoop *main_loop;
 #ifdef ZTS
 	void ***thread_ctx;
 #endif
@@ -222,8 +223,8 @@ static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPSe
 	}
 	zval_ptr_dtor(&(args[0]));
 	zval_ptr_dtor(&(args[1]));
-	
-	g_main_loop_quit(GUPNP_G(main_loop));
+
+	g_main_loop_quit(cpoint->main_loop);
 	
 	return;
 }
@@ -233,8 +234,6 @@ static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPSe
  */
 static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const char *variable, GValue *value, gpointer userdata)
 {
-	printf("Value changed, value_type: %s \n", G_VALUE_TYPE_NAME(value));
-	
 	zval *args[3];
 	php_gupnp_service_proxy_t *sproxy = (php_gupnp_service_proxy_t *)userdata;
 	php_gupnp_callback_t *callback;
@@ -377,8 +376,6 @@ PHP_MINIT_FUNCTION(gupnp)
 	/* Required initialisation */
 	g_thread_init(NULL);
 	g_type_init();
-	
-	//GUPNP_G(context) = gupnp_context_new(NULL, NULL, 0, NULL);
 	
 	return SUCCESS;
 }
@@ -598,16 +595,15 @@ PHP_FUNCTION(gupnp_browse_service)
 	old_callback = cpoint->callback;
 	cpoint->callback = callback;
 	
+	cpoint->main_loop = g_main_loop_new(NULL, FALSE);
+	
 	g_signal_connect(cpoint->cp, "service-proxy-available", 
 					 G_CALLBACK(_php_gupnp_service_proxy_available_cb), cpoint);
-
+	
 	/* Tell the Control Point to start searching */
 	gssdp_resource_browser_set_active(GSSDP_RESOURCE_BROWSER(cpoint->cp), TRUE);
   
-	/* Enter the main loop. This will start the search and result in callbacks to
-	   _php_gupnp_service_proxy_available_cb. */
-	GUPNP_G(main_loop) = g_main_loop_new(NULL, FALSE);
-	g_main_loop_run(GUPNP_G(main_loop));
+	g_main_loop_run(cpoint->main_loop);
 	
 	if (old_callback) {
 		_php_gupnp_callback_free(old_callback);
@@ -766,7 +762,6 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to send action: %s", error->message);
 			g_error_free(error);
 		}
-		php_printf("result false\n");
 		RETURN_FALSE;
 	}
 	
