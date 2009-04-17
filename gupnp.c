@@ -35,6 +35,12 @@ typedef struct _php_gupnp_callback_t { /* {{{ */
 } php_gupnp_callback_t;
 /* }}} */
 
+typedef struct _php_gupnp_context_t { /* {{{ */
+	GUPnPContext *context;
+	int rsrc_id;
+} php_gupnp_context_t;
+/* }}} */
+
 typedef struct _php_gupnp_cpoint_t { /* {{{ */
 	GUPnPControlPoint *cp;
 	int rsrc_id;
@@ -44,6 +50,12 @@ typedef struct _php_gupnp_cpoint_t { /* {{{ */
 	void ***thread_ctx;
 #endif
 } php_gupnp_cpoint_t;
+/* }}} */
+
+typedef struct _php_gupnp_rdevice_t { /* {{{ */
+	GUPnPRootDevice *rd;
+	int rsrc_id;
+} php_gupnp_rdevice_t;
 /* }}} */
 
 typedef struct _php_gupnp_service_proxy_t { /* {{{ */
@@ -56,19 +68,20 @@ typedef struct _php_gupnp_service_proxy_t { /* {{{ */
 } php_gupnp_service_proxy_t;
 /* }}} */
 
-typedef struct _php_gupnp_context_t { /* {{{ */
-	GUPnPContext *context;
-	int rsrc_id;
-} php_gupnp_context_t;
-/* }}} */
-
 /* True global resources - no need for thread safety here */
 static int le_context;
 static int le_cpoint;
+static int le_rdevice;
 static int le_proxy;
 
 #define ZVAL_TO_CONTEXT(zval, context) \
 		ZEND_FETCH_RESOURCE(context, php_gupnp_context_t *, &zval, -1, "context", le_context)
+
+#define ZVAL_TO_RDEVICE(zval, rdevice) \
+		ZEND_FETCH_RESOURCE(rdevice, php_gupnp_rdevice_t *, &zval, -1, "root device", le_rdevice)
+
+#define ZVAL_TO_CPOINT(zval, cpoint) \
+		ZEND_FETCH_RESOURCE(cpoint, php_gupnp_cpoint_t *, &zval, -1, "control point", le_cpoint)
 
 #define ZVAL_TO_PROXY(zval, proxy) \
 		ZEND_FETCH_RESOURCE(proxy, php_gupnp_service_proxy_t *, &zval, -1, "proxy", le_proxy)
@@ -84,7 +97,14 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_context_get_port,	NULL)
 	PHP_FE(gupnp_context_set_subscription_timeout,	NULL)
 	PHP_FE(gupnp_context_get_subscription_timeout,	NULL)
+	PHP_FE(gupnp_context_host_path,	NULL)
+	PHP_FE(gupnp_context_unhost_path,	NULL)
 	PHP_FE(gupnp_control_point_new,	NULL)
+	PHP_FE(gupnp_root_device_new,	NULL)
+	PHP_FE(gupnp_root_device_set_available,	NULL)
+	PHP_FE(gupnp_root_device_get_available,	NULL)
+	PHP_FE(gupnp_root_device_get_relative_location,	NULL)
+	PHP_FE(gupnp_device_info_get,	NULL)
 	PHP_FE(gupnp_browse_service, 	NULL)
 	PHP_FE(gupnp_service_info_get, 	NULL)
 	PHP_FE(gupnp_service_proxy_action_set, 	NULL)
@@ -133,10 +153,10 @@ PHP_INI_END()
 
 /* {{{ php_gupnp_init_globals
  */
-static void php_gupnp_init_globals(zend_gupnp_globals *gupnp_globals)
+/*static void php_gupnp_init_globals(zend_gupnp_globals *gupnp_globals)
 {
 	gupnp_globals->main_loop = NULL;
-}
+}*/
 /* }}} */
 
 /* {{{ _php_gupnp_callback_free
@@ -164,6 +184,19 @@ static void _php_gupnp_cpoint_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ 
 	_php_gupnp_callback_free(cpoint->callback);
 	g_object_unref(cpoint->cp);
 	efree(cpoint);
+}
+/* }}} */
+
+/* {{{ _php_gupnp_rdevice_dtor
+ */
+static void _php_gupnp_rdevice_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
+{
+	php_gupnp_rdevice_t *rdevice = (php_gupnp_rdevice_t *)rsrc->ptr;
+	
+	if (rdevice->rd) {
+		g_object_unref(rdevice->rd);
+	}
+	efree(rdevice);
 }
 /* }}} */
 
@@ -371,6 +404,7 @@ PHP_MINIT_FUNCTION(gupnp)
 	
 	le_context = zend_register_list_destructors_ex(_php_gupnp_context_dtor, NULL, "context", module_number);
 	le_cpoint = zend_register_list_destructors_ex(_php_gupnp_cpoint_dtor, NULL, "control point", module_number);
+	le_rdevice = zend_register_list_destructors_ex(_php_gupnp_rdevice_dtor, NULL, "root device", module_number);
 	le_proxy = zend_register_list_destructors_ex(_php_gupnp_proxy_dtor, NULL, "proxy", module_number);
 	
 	/* Required initialisation */
@@ -533,6 +567,49 @@ PHP_FUNCTION(gupnp_context_get_subscription_timeout)
 }
 /* }}} */
 
+/* {{{ proto bool gupnp_context_host_path(resource context, string local_path, string server_path)
+   Start hosting local_path at server_path. Files with the path local_path.LOCALE (if they exist) 
+   will be served up when LOCALE is specified in the request's Accept-Language header. */
+PHP_FUNCTION(gupnp_context_host_path)
+{
+	zval *zcontext;
+	char *local_path, *server_path;
+	int local_path_len, server_path_len;
+	php_gupnp_context_t *context = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rss", &zcontext, 
+			&local_path, &local_path_len, &server_path, &server_path_len) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_CONTEXT(zcontext, context);
+	gupnp_context_host_path(context->context, local_path, server_path);
+	
+	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_context_unhost_path(resource context, string server_path)
+   Stop hosting the file or folder at server_path. */
+PHP_FUNCTION(gupnp_context_unhost_path)
+{
+	zval *zcontext;
+	char *server_path;
+	int server_path_len;
+	php_gupnp_context_t *context = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &zcontext, 
+			&server_path, &server_path_len) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_CONTEXT(zcontext, context);
+	gupnp_context_unhost_path(context->context, server_path);
+	
+	RETURN_TRUE;
+}
+/* }}} */
+
 /* {{{ proto resource gupnp_control_point_new(resource context, string target)
    Create a new Control point with the specified target */
 PHP_FUNCTION(gupnp_control_point_new)
@@ -552,10 +629,122 @@ PHP_FUNCTION(gupnp_control_point_new)
 	cpoint = emalloc(sizeof(php_gupnp_cpoint_t));
 	cpoint->cp = gupnp_control_point_new(context->context, target);
 	cpoint->callback = NULL;
+	cpoint->main_loop = NULL;
 	TSRMLS_SET_CTX(cpoint->thread_ctx);
 	cpoint->rsrc_id = zend_list_insert(cpoint, le_cpoint);
 	
 	RETURN_RESOURCE(cpoint->rsrc_id);
+}
+/* }}} */
+
+/* {{{ proto resource gupnp_root_device_new(resource context, string location)
+   Create a new root device, automatically downloading and parsing location. */
+PHP_FUNCTION(gupnp_root_device_new)
+{
+	char *location = NULL;
+	int location_len;
+	zval *zcontext;
+	php_gupnp_rdevice_t *rdevice = NULL;
+	php_gupnp_context_t *context = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &zcontext, &location, &location_len) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_CONTEXT(zcontext, context);
+		
+	rdevice = emalloc(sizeof(php_gupnp_rdevice_t));
+	if (rdevice->rd = gupnp_root_device_new(context->context, location)) {
+		rdevice->rsrc_id = zend_list_insert(rdevice, le_rdevice);
+		RETURN_RESOURCE(rdevice->rsrc_id);
+	}
+	efree(rdevice);
+	RETURN_FALSE;
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_root_device_set_available(resource root_device, bool available)
+   Controls whether or not root_device is available (announcing its presence). */
+PHP_FUNCTION(gupnp_root_device_set_available)
+{
+	gboolean available;
+	zval *zrdevice;
+	php_gupnp_rdevice_t *rdevice = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rb", &zrdevice, &available) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_RDEVICE(zrdevice, rdevice);
+	
+	gupnp_root_device_set_available(rdevice->rd, available);
+		
+	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_root_device_get_available(resource root_device)
+   Get whether or not root_device is available (announcing its presence). */
+PHP_FUNCTION(gupnp_root_device_get_available)
+{
+	gboolean result;
+	zval *zrdevice;
+	php_gupnp_rdevice_t *rdevice = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zrdevice) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_RDEVICE(zrdevice, rdevice);
+	
+	result = gupnp_root_device_get_available(rdevice->rd);
+	
+	if (result) {
+		RETURN_TRUE;
+	}
+	RETURN_FALSE;
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_root_device_get_available(resource root_device)
+   Get whether or not root_device is available (announcing its presence). */
+PHP_FUNCTION(gupnp_root_device_get_relative_location)
+{
+	char *location;
+	zval *zrdevice;
+	php_gupnp_rdevice_t *rdevice = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zrdevice) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_RDEVICE(zrdevice, rdevice);
+	
+	location = (char *)gupnp_root_device_get_relative_location(rdevice->rd);
+	
+	RETURN_STRING(location, 1);
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_device_info_get(resource root_device)
+   Get whether or not root_device is available (announcing its presence). */
+PHP_FUNCTION(gupnp_device_info_get)
+{
+	zval *zrdevice;
+	php_gupnp_rdevice_t *rdevice = NULL;
+	SoupURI* url_base;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zrdevice) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_RDEVICE(zrdevice, rdevice);
+	
+	url_base = gupnp_device_info_get_url_base(GUPNP_DEVICE_INFO(rdevice->rd));
+	
+	array_init(return_value);
+	add_assoc_string(return_value, "location", (char *)gupnp_device_info_get_location(GUPNP_DEVICE_INFO(rdevice->rd)), 1);
+	add_assoc_string(return_value, "url_base", soup_uri_to_string(url_base, 1), 1);
 }
 /* }}} */
 
@@ -572,7 +761,7 @@ PHP_FUNCTION(gupnp_browse_service)
 		return;
 	}
 	
-	ZEND_FETCH_RESOURCE(cpoint, php_gupnp_cpoint_t *, &zcpoint, -1, "control point", le_cpoint);
+	ZVAL_TO_CPOINT(zcpoint, cpoint);
 	
 	if (!zend_is_callable(zcallback, 0, &func_name)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
