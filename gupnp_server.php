@@ -2,6 +2,21 @@
 
 //phpinfo();
 
+function action_cb($variable, $value, $arg)
+{
+	echo "=========================================================\n";
+	echo "[CALL] action_cb()\n";
+	echo "---------------------------------------------------------\n";
+
+	echo "[VARIABLE]: ";
+	var_dump($variable);
+	echo "[VALUE]: ";
+	var_dump($value);
+	echo "[ARG]: ";
+	var_dump($arg);
+	echo "=========================================================\n\n\n";
+}
+
 echo "=========================================================\n";
 echo "[CALL]: gupnp_context_new() \n";
 echo "---------------------------------------------------------\n";
@@ -61,7 +76,7 @@ echo "[RESULT]: ";
 var_dump($result);
 echo "=========================================================\n\n\n";
 
-$local_path_2 = "SwitchPower1.xml";
+$local_path_2 = $_SERVER["PWD"] . "/ext/gupnp/examples/SwitchPower1.xml";
 $server_path_2 = "/SwitchPower1.xml";
 
 echo "=========================================================\n";
@@ -112,7 +127,6 @@ echo "[RESULT]: ";
 var_dump($result);
 echo "=========================================================\n\n\n";
 
-
 echo "=========================================================\n";
 echo "[CALL]: gupnp_device_info_get($device) \n";
 echo "---------------------------------------------------------\n";
@@ -120,5 +134,30 @@ $result = gupnp_device_info_get($device);
 echo "[RESULT]: ";
 var_dump($result);
 echo "=========================================================\n\n\n";
+
+$service_type = "urn:schemas-upnp-org:service:SwitchPower:1";
+echo "=========================================================\n";
+echo "[CALL]: gupnp_device_info_get_service($device, $service_type) \n";
+echo "---------------------------------------------------------\n";
+$service_info = gupnp_device_info_get_service($device, $service_type);
+echo "[RESULT]: ";
+var_dump($service_info);
+echo "=========================================================\n\n\n";
+
+$cb = "action_cb";
+$arg = "action data";
+$action_name = "action-invoked::GetStatus";
+echo "=========================================================\n";
+echo "[CALL]: gupnp_device_action_callback_set($service_info, $action_name, $cb, $arg) \n";
+echo "---------------------------------------------------------\n";
+$result = gupnp_device_action_callback_set($service_info, $action_name, $cb, $arg);
+echo "[RESULT]: ";
+var_dump($result);
+echo "=========================================================\n\n\n";
+
+
+gupnp_main_loop_run();
+sleep(5);
+gupnp_main_loop_stop();
 
 ?>
