@@ -67,6 +67,8 @@ PHP_FUNCTION(gupnp_service_proxy_set_subscribed);
 PHP_FUNCTION(gupnp_service_proxy_get_subscribed);
 PHP_FUNCTION(gupnp_service_proxy_add_notify);
 PHP_FUNCTION(gupnp_service_proxy_remove_notify);
+PHP_FUNCTION(gupnp_service_action_set);
+PHP_FUNCTION(gupnp_service_action_return);
 
 ZEND_BEGIN_MODULE_GLOBALS(gupnp)
 	GMainLoop *main_loop;

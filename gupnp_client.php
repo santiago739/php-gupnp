@@ -339,6 +339,7 @@ echo "=========================================================\n\n\n";
 
 while(1)
 {
+	/*
 	$value = rand(1, 100);
 	echo "---------------------------------------------------------\n";
 	echo "[CALL]: gupnp_service_proxy_action_set($proxy1, 'SetChannel', 'Channel', $value, GUPNP_TYPE_LONG) \n";
@@ -356,6 +357,7 @@ while(1)
 	echo "[RESULT]: ";
 	var_dump($res);
 	echo "---------------------------------------------------------\n\n";
+	*/
 }
 
 ?>

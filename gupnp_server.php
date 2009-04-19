@@ -2,18 +2,42 @@
 
 //phpinfo();
 
-function action_cb($variable, $value, $arg)
+function action_cb($action, $arg)
 {
 	echo "=========================================================\n";
 	echo "[CALL] action_cb()\n";
 	echo "---------------------------------------------------------\n";
-
-	echo "[VARIABLE]: ";
-	var_dump($variable);
-	echo "[VALUE]: ";
-	var_dump($value);
+	
+	echo "[ACTION]: ";
+	var_dump($action);
 	echo "[ARG]: ";
 	var_dump($arg);
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_action_set($action, 'ResultStatus', GUPNP_TYPE_BOOLEAN, true) \n";
+	echo "---------------------------------------------------------\n";
+	$res = gupnp_service_action_set($action, 'ResultStatus', GUPNP_TYPE_BOOLEAN, true);
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_action_return($action) \n";
+	echo "---------------------------------------------------------\n";
+	$res = gupnp_service_action_return($action);
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
+	
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_main_loop_stop() \n";
+	echo "---------------------------------------------------------\n";
+	$res = gupnp_main_loop_stop();
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
+	
+
 	echo "=========================================================\n\n\n";
 }
 
