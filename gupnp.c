@@ -81,6 +81,10 @@ typedef struct _php_gupnp_service_info_t { /* {{{ */
 typedef struct _php_gupnp_service_action_t { /* {{{ */
 	GUPnPServiceAction *action;
 	int rsrc_id;
+	php_gupnp_callback_t *callback;
+#ifdef ZTS
+	void ***thread_ctx;
+#endif
 } php_gupnp_service_action_t;
 /* }}} */
 
@@ -270,9 +274,10 @@ static void _php_gupnp_service_info_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /
  */
 static void _php_gupnp_service_action_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
-	php_gupnp_service_action_t *action = (php_gupnp_service_action_t *)rsrc->ptr;
+	php_gupnp_service_action_t *service_action = (php_gupnp_service_action_t *)rsrc->ptr;
 	
-	efree(action);
+	_php_gupnp_callback_free(service_action->callback);
+	efree(service_action);
 }
 /* }}} */
 
@@ -372,26 +377,26 @@ static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const c
  */
 static void _php_gupnp_device_action_cb(GUPnPService *service, GUPnPServiceAction *action, gpointer userdata) {
 	zval *args[2];
-	php_gupnp_service_info_t *service_info = (php_gupnp_service_info_t *)userdata;
+	//php_gupnp_service_info_t *service_info = (php_gupnp_service_info_t *)userdata;
 	php_gupnp_callback_t *callback;
-	php_gupnp_service_action_t *service_action;
+	php_gupnp_service_action_t *service_action = (php_gupnp_service_action_t *)userdata;
 	zval retval;
 	
-	TSRMLS_FETCH_FROM_CTX(service_info ? service_info->thread_ctx : NULL);
+	TSRMLS_FETCH_FROM_CTX(service_action ? service_action->thread_ctx : NULL);
 	
-	if (!service_info || !service_info->callback) {
+	if (!service_action || !service_action->callback) {
 		return;
 	}
 	
-	service_action = emalloc(sizeof(php_gupnp_service_action_t));
+	//service_action = emalloc(sizeof(php_gupnp_service_action_t));
 	service_action->action = action;
-	service_action->rsrc_id = zend_list_insert(service_action, le_service_action);
+	//service_action->rsrc_id = zend_list_insert(service_action, le_service_action);
 	
 	MAKE_STD_ZVAL(args[0]);
 	ZVAL_RESOURCE(args[0], service_action->rsrc_id);
 	zend_list_addref(service_action->rsrc_id);
 	
-	callback = service_info->callback;
+	callback = service_action->callback;
 	args[1] = callback->arg;
 	args[1]->refcount++;
 	
@@ -920,6 +925,7 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 	int action_name_len;
 	php_gupnp_callback_t *callback, *old_callback;
 	php_gupnp_service_info_t *service;
+	php_gupnp_service_action_t *service_action;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rsz|z", &zservice, &action_name, &action_name_len, &zcallback, &zarg) == FAILURE) {
 		return;
@@ -945,14 +951,21 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 	callback->func = zcallback;
 	callback->arg = zarg;
 	
-	old_callback = service->callback;
-	service->callback = callback;
+	service_action = emalloc(sizeof(php_gupnp_service_action_t));
+	service_action->action = NULL;
+	service_action->callback = callback;
+	service_action->rsrc_id = zend_list_insert(service_action, le_service_action);
 	
-	g_signal_connect(service->service_info, action_name, G_CALLBACK(_php_gupnp_device_action_cb), service);
+	//old_callback = service->callback;
+	//service->callback = callback;
 	
+	g_signal_connect(service->service_info, action_name, G_CALLBACK(_php_gupnp_device_action_cb), service_action);
+	
+	/*
 	if (old_callback) {
 		_php_gupnp_callback_free(old_callback);
 	}
+	*/
 
 	RETURN_TRUE;
 }
@@ -962,10 +975,8 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
    Get the IP address we advertise ourselves as using. */
 PHP_FUNCTION(gupnp_main_loop_run)
 {
-	main_loop = g_main_loop_new (NULL, FALSE);
-	printf("before g_main_loop_run (main_loop)\n");
-  	g_main_loop_run (main_loop);
-	printf("g_main_loop_run (main_loop) started\n");
+	main_loop = g_main_loop_new(NULL, FALSE);
+  	g_main_loop_run(main_loop);
 }
 /* }}} */
 
@@ -973,9 +984,7 @@ PHP_FUNCTION(gupnp_main_loop_run)
    Get the IP address we advertise ourselves as using. */
 PHP_FUNCTION(gupnp_main_loop_stop)
 {
-	printf("before gupnp_main_loop_stop (main_loop)\n");
 	g_main_loop_unref(main_loop);
-	printf("gupnp_main_loop_stop (main_loop) finished\n");
 }
 /* }}} */
 

@@ -7,14 +7,10 @@ function switcher_service_cb($proxy, $arg)
 	global $proxy1;
 
 	$proxy1 = $proxy;
-
+	
+	echo "[PROXY]: ";
 	var_dump($proxy);
-	var_dump($arg);
-
-	//unset($proxy);
-	unset($arg);
-
-	//var_dump($proxy);
+	echo "[ARG]: ";
 	var_dump($arg);
 
 	echo "---------------------------------------------------------\n";
@@ -57,6 +53,7 @@ function switcher_service_cb($proxy, $arg)
 	var_dump($res);
 	echo "---------------------------------------------------------\n\n";
 
+/*
 	echo "---------------------------------------------------------\n";
 	echo "[CALL]: gupnp_service_proxy_action_set($proxy, 'SetTarget', 'NewTargetValue', 1, GUPNP_TYPE_LONG) \n";
 	echo "---------------------------------------------------------\n";
@@ -120,6 +117,7 @@ function switcher_service_cb($proxy, $arg)
 	echo "[RESULT]: ";
 	var_dump($res);
 	echo "---------------------------------------------------------\n\n";
+*/
 
 	echo "---------------------------------------------------------\n";
 	echo "[CALL]: gupnp_service_proxy_get_subscribed() \n";
