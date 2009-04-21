@@ -1,11 +1,15 @@
 <?php
 
-function action_getstatus_cb($action, $arg)
+$GLOBALS['status'] = false;
+
+function action_getstatus_cb($service, $action, $arg)
 {
 	echo "=========================================================\n";
 	echo "[CALL] action_getstatus_cb()\n";
 	echo "---------------------------------------------------------\n";
 	
+	echo "[SERVICE]: ";
+	var_dump($service);
 	echo "[ACTION]: ";
 	var_dump($action);
 	echo "[ARG]: ";
@@ -30,16 +34,39 @@ function action_getstatus_cb($action, $arg)
 	echo "=========================================================\n\n\n";
 }
 
-function action_settarget_cb($action, $arg)
+function action_settarget_cb($service, $action, $arg)
 {
 	echo "=========================================================\n";
 	echo "[CALL] action_settarget_cb()\n";
 	echo "---------------------------------------------------------\n";
 	
+	echo "[SERVICE]: ";
+	var_dump($service);
 	echo "[ACTION]: ";
 	var_dump($action);
 	echo "[ARG]: ";
 	var_dump($arg);
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_action_get($action, 'NewTargetValue', GUPNP_TYPE_BOOLEAN) \n";
+	echo "---------------------------------------------------------\n";
+	$res = gupnp_service_action_get($action, 'NewTargetValue', GUPNP_TYPE_BOOLEAN);
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
+
+	if ($GLOBALS['status'] != $res)
+	{
+		$GLOBALS['status'] = $res;
+	}
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_notify($service, 'Status', GUPNP_TYPE_BOOLEAN, ".$GLOBALS['status'].") \n";
+	echo "---------------------------------------------------------\n";
+	$res = gupnp_service_notify($service, 'Status', GUPNP_TYPE_BOOLEAN, $GLOBALS['status']);
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
 
 	echo "---------------------------------------------------------\n";
 	echo "[CALL]: gupnp_service_action_return($action) \n";
