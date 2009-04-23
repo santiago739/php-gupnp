@@ -260,7 +260,7 @@ function remove_notify_cb($variable, $value, $arg)
 }
 
 echo "=========================================================\n";
-echo "[CALL]: gupnp_control_point_new() \n";
+echo "[CALL]: gupnp_context_new() \n";
 echo "---------------------------------------------------------\n";
 $context = gupnp_context_new();
 echo "[RESULT]: ";
