@@ -103,8 +103,6 @@ static int le_service_proxy;
 static int le_service_info;
 static int le_service_action;
 
-GMainLoop *main_loop; // TO DELETE
-
 #define ZVAL_TO_CONTEXT(zval, context) \
 		ZEND_FETCH_RESOURCE(context, php_gupnp_context_t *, &zval, -1, "context", le_context)
 
@@ -199,12 +197,23 @@ PHP_INI_END()
 */
 /* }}} */
 
-/* {{{ php_gupnp_init_globals
+/* {{{ _php_gupnp_globals_ctor
  */
-/*static void php_gupnp_init_globals(zend_gupnp_globals *gupnp_globals)
+static void _php_gupnp_globals_ctor(zend_gupnp_globals *gupnp_globals TSRMLS_DC)
 {
 	gupnp_globals->main_loop = NULL;
-}*/
+}
+/* }}} */
+
+/* {{{ _php_gupnp_globals_ctor
+ */
+static void _php_gupnp_globals_dtor(zend_gupnp_globals *gupnp_globals TSRMLS_DC)
+{
+	/* Clean up */
+	if (gupnp_globals->main_loop) {
+		g_main_loop_unref(gupnp_globals->main_loop);
+	}
+}
 /* }}} */
 
 /* {{{ _php_gupnp_callback_free
@@ -535,6 +544,15 @@ PHP_MINIT_FUNCTION(gupnp)
 	g_thread_init(NULL);
 	g_type_init();
 	
+#ifdef ZTS     
+	ts_allocate_id(&gupnp_globals_id, 
+		sizeof(zend_gupnp_globals), 
+		(ts_allocate_ctor)_php_gupnp_globals_ctor, 
+		(ts_allocate_dtor)_php_gupnp_globals_dtor); 
+#else 
+		_php_gupnp_globals_ctor(&gupnp_globals TSRMLS_CC); 
+#endif 
+	
 	return SUCCESS;
 }
 /* }}} */
@@ -546,12 +564,18 @@ PHP_MSHUTDOWN_FUNCTION(gupnp)
 	/* uncomment this line if you have INI entries
 	UNREGISTER_INI_ENTRIES();
 	*/
+
+#ifndef ZTS
+	_php_gupnp_globals_dtor(&gupnp_globals TSRMLS_CC); 
+#endif 	
 	
 	/* Clean up */
+	/*
 	if (GUPNP_G(main_loop)) {
 		g_main_loop_unref(GUPNP_G(main_loop));
 		
 	}
+	*/
 	/*if (GUPNP_G(context)) {
 		g_object_unref(GUPNP_G(context));
 	}*/
@@ -860,7 +884,7 @@ PHP_FUNCTION(gupnp_device_info_get)
 	php_gupnp_rdevice_t *rdevice = NULL;
 	char *info_data[2][14];
 	int i;
-	SoupURI* url_base;
+	SoupURI *url_base;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zrdevice) == FAILURE) {
 		return;
@@ -868,7 +892,7 @@ PHP_FUNCTION(gupnp_device_info_get)
 	
 	ZVAL_TO_RDEVICE(zrdevice, rdevice);
 	
-	url_base = gupnp_device_info_get_url_base(GUPNP_DEVICE_INFO(rdevice->rd));
+	url_base = (SoupURI *)gupnp_device_info_get_url_base(GUPNP_DEVICE_INFO(rdevice->rd));
 	
 	info_data[0][0] = "location";
 	info_data[1][0] = (char *)gupnp_device_info_get_location(GUPNP_DEVICE_INFO(rdevice->rd));
@@ -948,7 +972,7 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 	zval *zservice, *zcallback, *zarg = NULL;
 	char *func_name, *action_name;
 	int action_name_len;
-	php_gupnp_callback_t *callback, *old_callback;
+	php_gupnp_callback_t *callback;
 	php_gupnp_service_info_t *service;
 	php_gupnp_service_action_t *service_action;
 	
@@ -980,18 +1004,10 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 	service_action->action = NULL;
 	service_action->callback = callback;
 	service_action->rsrc_id = zend_list_insert(service_action, le_service_action);
-	
-	//old_callback = service->callback;
-	//service->callback = callback;
+	TSRMLS_SET_CTX(service_action->thread_ctx);
 	
 	g_signal_connect(service->service_info, action_name, G_CALLBACK(_php_gupnp_device_action_cb), service_action);
 	
-	/*
-	if (old_callback) {
-		_php_gupnp_callback_free(old_callback);
-	}
-	*/
-
 	RETURN_TRUE;
 }
 /* }}} */
@@ -1000,8 +1016,8 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
    Get the IP address we advertise ourselves as using. */
 PHP_FUNCTION(gupnp_main_loop_run)
 {
-	main_loop = g_main_loop_new(NULL, FALSE);
-  	g_main_loop_run(main_loop);
+	GUPNP_G(main_loop) = g_main_loop_new(NULL, FALSE);
+  	g_main_loop_run(GUPNP_G(main_loop));
 }
 /* }}} */
 
@@ -1009,7 +1025,7 @@ PHP_FUNCTION(gupnp_main_loop_run)
    Get the IP address we advertise ourselves as using. */
 PHP_FUNCTION(gupnp_main_loop_stop)
 {
-	g_main_loop_unref(main_loop);
+	g_main_loop_unref(GUPNP_G(main_loop));
 }
 /* }}} */
 
@@ -1083,7 +1099,7 @@ PHP_FUNCTION(gupnp_service_info_get)
 	
 	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
 	
-	url_base = gupnp_service_info_get_url_base(GUPNP_SERVICE_INFO(sproxy->proxy));
+	url_base = (SoupURI *)gupnp_service_info_get_url_base(GUPNP_SERVICE_INFO(sproxy->proxy));
 	
 	info_data[0][0] = "location";
 	info_data[1][0] = (char *)gupnp_service_info_get_location(GUPNP_SERVICE_INFO(sproxy->proxy));
@@ -1313,14 +1329,12 @@ PHP_FUNCTION(gupnp_service_proxy_add_notify)
 	}
 	efree(func_name);
 	
-	
 	zval_add_ref(&zcallback);
 	if (zarg) {
 		zval_add_ref(&zarg);
 	} else {
 		ALLOC_INIT_ZVAL(zarg);
 	}
-	
 	
 	callback = emalloc(sizeof(php_gupnp_callback_t));
 	callback->func = zcallback;
@@ -1431,7 +1445,7 @@ PHP_FUNCTION(gupnp_service_action_set)
    Sends action with parameters to the service exposed by proxy synchronously and set value. */
 PHP_FUNCTION(gupnp_service_action_get)
 {
-	zval *zaction, *param_val;
+	zval *zaction;
 	char *param_name;
 	int param_name_len;
 	long param_type;
@@ -1446,46 +1460,27 @@ PHP_FUNCTION(gupnp_service_action_get)
 	
 	ZVAL_TO_SERVICE_ACTION(zaction, service_action);
 	
-	gboolean value_bool;
 	switch (param_type) {
 		case G_TYPE_BOOLEAN:
-			
-			gupnp_service_action_get(service_action->action, param_name, param_type, &value_bool, NULL);
-			RETURN_BOOL(value_bool);
-			//gupnp_service_action_get_value(service_action->action, param_name, &g_value);
-			//RETURN_BOOL(g_value_get_boolean(&g_value));
-			break; 
-		/*
+			g_value_init(&g_value, G_TYPE_BOOLEAN);
+			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
+			RETURN_BOOL(g_value_get_boolean(&g_value));
+
 		case G_TYPE_LONG:
-			if (Z_TYPE_P(param_val) == IS_LONG) {
-				gupnp_service_action_set(service_action->action, param_name, param_type, Z_LVAL_P(param_val), NULL);
-				RETURN_TRUE;
-			} else {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' must be integer");
-				return;
-			}
-			break; 
+			g_value_init(&g_value, G_TYPE_LONG);
+			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
+			RETURN_LONG(g_value_get_long(&g_value));
 		
 		case G_TYPE_DOUBLE: 
-			if (Z_TYPE_P(param_val) == IS_DOUBLE) {
-				gupnp_service_action_set(service_action->action, param_name, param_type, Z_DVAL_P(param_val), NULL);
-				RETURN_TRUE;
-			} else {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' must be float");
-				return;
-			}
-			break; 
+			g_value_init(&g_value, G_TYPE_DOUBLE);
+			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
+			RETURN_DOUBLE(g_value_get_double(&g_value));
 			
 		case G_TYPE_STRING: 
-			if (Z_TYPE_P(param_val) == IS_STRING) {
-				gupnp_service_action_set(service_action->action, param_name, param_type, Z_STRVAL_P(param_val), NULL);
-				RETURN_TRUE;
-			} else {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' must be string");
-				return;
-			}
-			break; 
-		*/
+			g_value_init(&g_value, G_TYPE_STRING);
+			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
+			RETURN_STRING((char *)g_value_get_string(&g_value), 1);
+
 		default: 
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_type' is not correctly defined");
 			return;
@@ -1557,7 +1552,6 @@ PHP_FUNCTION(gupnp_service_notify)
 	}
 }
 /* }}} */
-
 
 /* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
    Sends action with parameters to the service exposed by proxy synchronously and set value. */

@@ -1,10 +1,40 @@
 <?php
 
+/* SetTarget */
+function set_target_cb($service, $action, $arg)
+{
+	/* Get the new target value */
+	$target = gupnp_service_action_get($action, 'NewTargetValue', GUPNP_TYPE_BOOLEAN);
+
+	/* If the new target doesn't match the current status, change the status and
+	   emit a notification that the status has changed. */
+	if ($target != $GLOBALS['status']) {
+		$GLOBALS['status'] = $target;
+		gupnp_service_notify($service, 'Status', GUPNP_TYPE_BOOLEAN, $GLOBALS['status']);
+		printf("The light is now %s.\n", $GLOBALS['status'] ? "on" : "off");
+	}
+
+	/* Return success to the client */
+	gupnp_service_action_return($action);
+}
+
+/* GetTarget */
+function get_target_cb($service, $action, $arg)
+{
+	gupnp_service_action_set($action, 'RetTargetValue', GUPNP_TYPE_BOOLEAN, $GLOBALS['status']);
+	gupnp_service_action_return($action);
+}
+
+/* GetStatus */
+function get_status_cb($service, $action, $arg)
+{
+	gupnp_service_action_set($action, 'ResultStatus', GUPNP_TYPE_BOOLEAN, $GLOBALS['status']);
+	gupnp_service_action_return($action);
+}
+
 /* By default the light is off */
-$status = false;
-printf("The light is now %s.\n", $status ? "on" : "off");
-
-
+$GLOBALS['status'] = false;
+printf("The light is now %s.\n", $GLOBALS['status'] ? "on" : "off");
 
 /* Create the UPnP context */
 $context = gupnp_context_new();
@@ -31,3 +61,19 @@ $service = gupnp_device_info_get_service($dev, $service_type);
 if (!$service) {
 	die("Cannot get SwitchPower1 service\n");
 }
+
+/* Set callback for action GetStatus*/
+gupnp_device_action_callback_set($service, "action-invoked::GetStatus", 
+	"get_status_cb", "action data, GetStatus");
+
+/* Set callback for action GetTarget*/
+gupnp_device_action_callback_set($service, "action-invoked::GetTarget", 
+	"get_target_cb", "action data, GetTarget");
+
+/* Set callback for action SetTarget*/
+gupnp_device_action_callback_set($service, "action-invoked::SetTarget", 
+	"set_target_cb", "action data, SetTarget");
+
+/* Run the main loop */
+gupnp_main_loop_run();
+
