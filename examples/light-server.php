@@ -75,6 +75,5 @@ gupnp_device_action_callback_set($service, "action-invoked::SetTarget",
 	"set_target_cb", "action data, SetTarget");
 
 /* Run the main loop */
-//gupnp_main_loop_run();
 gupnp_root_device_start($dev);
 
