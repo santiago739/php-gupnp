@@ -49,8 +49,9 @@ PHP_FUNCTION(gupnp_context_set_subscription_timeout);
 PHP_FUNCTION(gupnp_context_get_subscription_timeout);
 PHP_FUNCTION(gupnp_context_host_path);
 PHP_FUNCTION(gupnp_context_unhost_path);
-PHP_FUNCTION(gupnp_control_point_new);
 PHP_FUNCTION(gupnp_root_device_new);
+PHP_FUNCTION(gupnp_root_device_start);
+PHP_FUNCTION(gupnp_root_device_stop);
 PHP_FUNCTION(gupnp_root_device_set_available);
 PHP_FUNCTION(gupnp_root_device_get_available);
 PHP_FUNCTION(gupnp_root_device_get_relative_location);
@@ -59,7 +60,10 @@ PHP_FUNCTION(gupnp_device_info_get_service);
 PHP_FUNCTION(gupnp_device_action_callback_set);
 PHP_FUNCTION(gupnp_main_loop_run);
 PHP_FUNCTION(gupnp_main_loop_stop);
-PHP_FUNCTION(gupnp_browse_service);
+PHP_FUNCTION(gupnp_control_point_new);
+PHP_FUNCTION(gupnp_control_point_callback_set);
+PHP_FUNCTION(gupnp_control_point_browse_start);
+PHP_FUNCTION(gupnp_control_point_browse_stop);
 PHP_FUNCTION(gupnp_service_info_get);
 PHP_FUNCTION(gupnp_service_proxy_action_set);
 PHP_FUNCTION(gupnp_service_proxy_action_get);
@@ -68,6 +72,8 @@ PHP_FUNCTION(gupnp_service_proxy_get_subscribed);
 PHP_FUNCTION(gupnp_service_proxy_add_notify);
 PHP_FUNCTION(gupnp_service_proxy_remove_notify);
 PHP_FUNCTION(gupnp_service_action_set);
+PHP_FUNCTION(gupnp_service_action_get);
+PHP_FUNCTION(gupnp_service_notify);
 PHP_FUNCTION(gupnp_service_action_return);
 
 ZEND_BEGIN_MODULE_GLOBALS(gupnp)
@@ -76,6 +82,11 @@ ZEND_END_MODULE_GLOBALS(gupnp)
 
 #define GUPNP_ACTION_SET 0
 #define GUPNP_ACTION_GET 1
+
+#define GUPNP_SIGNAL_DPROXY_AVAILABLE 0
+#define GUPNP_SIGNAL_DPROXY_UNAVAILABLE 1
+#define GUPNP_SIGNAL_SPROXY_AVAILABLE 2
+#define GUPNP_SIGNAL_SPROXY_UNAVAILABLE 3
 
 /* In every utility function you add that needs to use variables 
    in php_gupnp_globals, call TSRMLS_FETCH(); after declaring other 

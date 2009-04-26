@@ -44,7 +44,7 @@ typedef struct _php_gupnp_context_t { /* {{{ */
 typedef struct _php_gupnp_cpoint_t { /* {{{ */
 	GUPnPControlPoint *cp;
 	int rsrc_id;
-	php_gupnp_callback_t *callback;
+	php_gupnp_callback_t *callbacks[4];
 	GMainLoop *main_loop;
 #ifdef ZTS
 	void ***thread_ctx;
@@ -55,7 +55,14 @@ typedef struct _php_gupnp_cpoint_t { /* {{{ */
 typedef struct _php_gupnp_rdevice_t { /* {{{ */
 	GUPnPRootDevice *rd;
 	int rsrc_id;
+	GMainLoop *main_loop;
 } php_gupnp_rdevice_t;
+/* }}} */
+
+typedef struct _php_gupnp_service_t { /* {{{ */
+	GUPnPService *service;
+	int rsrc_id;
+} php_gupnp_service_t;
 /* }}} */
 
 typedef struct _php_gupnp_service_proxy_t { /* {{{ */
@@ -66,6 +73,12 @@ typedef struct _php_gupnp_service_proxy_t { /* {{{ */
 	void ***thread_ctx;
 #endif
 } php_gupnp_service_proxy_t;
+/* }}} */
+
+typedef struct _php_gupnp_device_proxy_t { /* {{{ */
+	GUPnPDeviceProxy *proxy;
+	int rsrc_id;
+} php_gupnp_device_proxy_t;
 /* }}} */
 
 typedef struct _php_gupnp_service_info_t { /* {{{ */
@@ -81,6 +94,10 @@ typedef struct _php_gupnp_service_info_t { /* {{{ */
 typedef struct _php_gupnp_service_action_t { /* {{{ */
 	GUPnPServiceAction *action;
 	int rsrc_id;
+	php_gupnp_callback_t *callback;
+#ifdef ZTS
+	void ***thread_ctx;
+#endif
 } php_gupnp_service_action_t;
 /* }}} */
 
@@ -88,11 +105,11 @@ typedef struct _php_gupnp_service_action_t { /* {{{ */
 static int le_context;
 static int le_cpoint;
 static int le_rdevice;
-static int le_proxy;
+static int le_service;
+static int le_service_proxy;
+static int le_device_proxy;
 static int le_service_info;
 static int le_service_action;
-
-GMainLoop *main_loop; // TO DELETE
 
 #define ZVAL_TO_CONTEXT(zval, context) \
 		ZEND_FETCH_RESOURCE(context, php_gupnp_context_t *, &zval, -1, "context", le_context)
@@ -103,14 +120,20 @@ GMainLoop *main_loop; // TO DELETE
 #define ZVAL_TO_CPOINT(zval, cpoint) \
 		ZEND_FETCH_RESOURCE(cpoint, php_gupnp_cpoint_t *, &zval, -1, "control point", le_cpoint)
 
-#define ZVAL_TO_PROXY(zval, proxy) \
-		ZEND_FETCH_RESOURCE(proxy, php_gupnp_service_proxy_t *, &zval, -1, "proxy", le_proxy)
+#define ZVAL_TO_SERVICE(zval, service) \
+		ZEND_FETCH_RESOURCE(service, php_gupnp_service_t *, &zval, -1, "service", le_service)
 
-#define ZVAL_TO_SERVICE_INFO(zval, service) \
-		ZEND_FETCH_RESOURCE(service, php_gupnp_service_info_t *, &zval, -1, "service info", le_service_info)
+#define ZVAL_TO_SERVICE_PROXY(zval, service_proxy) \
+		ZEND_FETCH_RESOURCE(service_proxy, php_gupnp_service_proxy_t *, &zval, -1, "service proxy", le_service_proxy)
 
-#define ZVAL_TO_ACTION(zval, action) \
-		ZEND_FETCH_RESOURCE(action, php_gupnp_service_action_t *, &zval, -1, "servic action", le_service_action)
+#define ZVAL_TO_DEVICE_PROXY(zval, device_proxy) \
+		ZEND_FETCH_RESOURCE(device_proxy, php_gupnp_device_proxy_t *, &zval, -1, "device proxy", le_device_proxy)
+
+#define ZVAL_TO_SERVICE_INFO(zval, service_info) \
+		ZEND_FETCH_RESOURCE(service_info, php_gupnp_service_info_t *, &zval, -1, "service info", le_service_info)
+
+#define ZVAL_TO_SERVICE_ACTION(zval, service_action) \
+		ZEND_FETCH_RESOURCE(service_action, php_gupnp_service_action_t *, &zval, -1, "service action", le_service_action)
 
 
 /* {{{ gupnp_functions[]
@@ -125,8 +148,9 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_context_get_subscription_timeout,	NULL)
 	PHP_FE(gupnp_context_host_path,	NULL)
 	PHP_FE(gupnp_context_unhost_path,	NULL)
-	PHP_FE(gupnp_control_point_new,	NULL)
 	PHP_FE(gupnp_root_device_new,	NULL)
+	PHP_FE(gupnp_root_device_start,	NULL)
+	PHP_FE(gupnp_root_device_stop,	NULL)
 	PHP_FE(gupnp_root_device_set_available,	NULL)
 	PHP_FE(gupnp_root_device_get_available,	NULL)
 	PHP_FE(gupnp_root_device_get_relative_location,	NULL)
@@ -135,7 +159,10 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_device_action_callback_set,	NULL)
 	PHP_FE(gupnp_main_loop_run,	NULL)
 	PHP_FE(gupnp_main_loop_stop,	NULL)
-	PHP_FE(gupnp_browse_service, 	NULL)
+	PHP_FE(gupnp_control_point_new,	NULL)
+	PHP_FE(gupnp_control_point_callback_set,	NULL)
+	PHP_FE(gupnp_control_point_browse_start, 	NULL)
+	PHP_FE(gupnp_control_point_browse_stop, 	NULL)
 	PHP_FE(gupnp_service_info_get, 	NULL)
 	PHP_FE(gupnp_service_proxy_action_set, 	NULL)
 	PHP_FE(gupnp_service_proxy_action_get, 	NULL)
@@ -144,6 +171,8 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_service_proxy_add_notify, 	NULL)
 	PHP_FE(gupnp_service_proxy_remove_notify, 	NULL)
 	PHP_FE(gupnp_service_action_set, 	NULL)
+	PHP_FE(gupnp_service_action_get, 	NULL)
+	PHP_FE(gupnp_service_notify, 	NULL)
 	PHP_FE(gupnp_service_action_return, 	NULL)
 	{NULL, NULL, NULL}	/* Must be the last line in gupnp_functions[] */
 };
@@ -183,12 +212,23 @@ PHP_INI_END()
 */
 /* }}} */
 
-/* {{{ php_gupnp_init_globals
+/* {{{ _php_gupnp_globals_ctor
  */
-/*static void php_gupnp_init_globals(zend_gupnp_globals *gupnp_globals)
+static void _php_gupnp_globals_ctor(zend_gupnp_globals *gupnp_globals TSRMLS_DC)
 {
 	gupnp_globals->main_loop = NULL;
-}*/
+}
+/* }}} */
+
+/* {{{ _php_gupnp_globals_ctor
+ */
+static void _php_gupnp_globals_dtor(zend_gupnp_globals *gupnp_globals TSRMLS_DC)
+{
+	/* Clean up */
+	if (gupnp_globals->main_loop) {
+		g_main_loop_unref(gupnp_globals->main_loop);
+	}
+}
 /* }}} */
 
 /* {{{ _php_gupnp_callback_free
@@ -212,9 +252,17 @@ static inline void _php_gupnp_callback_free(php_gupnp_callback_t *callback) /* {
 static void _php_gupnp_cpoint_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)rsrc->ptr;
+	int i;
 	
-	_php_gupnp_callback_free(cpoint->callback);
+	//_php_gupnp_callback_free(cpoint->callback);
+	//_php_gupnp_callback_free(cpoint->callback_un);
+	
+	for (i = 0; i < 4; i++) {
+		_php_gupnp_callback_free(cpoint->callbacks[i]);
+	}
+	
 	g_object_unref(cpoint->cp);
+	g_main_loop_unref(cpoint->main_loop);
 	efree(cpoint);
 }
 /* }}} */
@@ -225,21 +273,40 @@ static void _php_gupnp_rdevice_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{
 {
 	php_gupnp_rdevice_t *rdevice = (php_gupnp_rdevice_t *)rsrc->ptr;
 	
-	if (rdevice->rd) {
-		g_object_unref(rdevice->rd);
-	}
+	g_object_unref(rdevice->rd);
+	g_main_loop_unref(rdevice->main_loop);
 	efree(rdevice);
 }
 /* }}} */
 
-/* {{{ _php_gupnp_proxy_dtor
+/* {{{ _php_gupnp_service_dtor
  */
-static void _php_gupnp_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
+static void _php_gupnp_service_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
+{
+	php_gupnp_service_t *service = (php_gupnp_service_t *)rsrc->ptr;
+	
+	efree(service);
+}
+/* }}} */
+
+/* {{{ _php_gupnp_service_proxy_dtor
+ */
+static void _php_gupnp_service_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_service_proxy_t *sproxy = (php_gupnp_service_proxy_t *)rsrc->ptr;
 	
 	_php_gupnp_callback_free(sproxy->callback);
 	efree(sproxy);
+}
+/* }}} */
+
+/* {{{ _php_gupnp_device_proxy_dtor
+ */
+static void _php_gupnp_device_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
+{
+	php_gupnp_device_proxy_t *dproxy = (php_gupnp_device_proxy_t *)rsrc->ptr;
+	
+	efree(dproxy);
 }
 /* }}} */
 
@@ -270,38 +337,31 @@ static void _php_gupnp_service_info_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /
  */
 static void _php_gupnp_service_action_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
-	php_gupnp_service_action_t *action = (php_gupnp_service_action_t *)rsrc->ptr;
+	php_gupnp_service_action_t *service_action = (php_gupnp_service_action_t *)rsrc->ptr;
 	
-	efree(action);
+	_php_gupnp_callback_free(service_action->callback);
+	efree(service_action);
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_proxy_available_cb
+/* {{{ _php_gupnp_service_proxy_cb
  */
-static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata)
+static void _php_gupnp_service_proxy_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, php_gupnp_callback_t *callback)
 {
 	zval *args[2];
-	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
-	php_gupnp_callback_t *callback;
 	php_gupnp_service_proxy_t *sproxy;
 	zval retval;
-	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
-	
-	if (!cpoint || !cpoint->callback) {
-		return;
-	}
 	
 	sproxy = emalloc(sizeof(php_gupnp_service_proxy_t));
 	sproxy->proxy = proxy;
 	sproxy->callback = NULL;
 	TSRMLS_SET_CTX(sproxy->thread_ctx);
-	sproxy->rsrc_id = zend_list_insert(sproxy, le_proxy);
+	sproxy->rsrc_id = zend_list_insert(sproxy, le_service_proxy);
 	
 	MAKE_STD_ZVAL(args[0]);
 	ZVAL_RESOURCE(args[0], sproxy->rsrc_id);
 	zend_list_addref(sproxy->rsrc_id);
 	
-	callback = cpoint->callback;
 	args[1] = callback->arg;
 	args[1]->refcount++;
 	
@@ -311,7 +371,98 @@ static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPSe
 	zval_ptr_dtor(&(args[0]));
 	zval_ptr_dtor(&(args[1]));
 
-	g_main_loop_quit(cpoint->main_loop);
+	return;
+}
+/* }}} */
+
+/* {{{ _php_gupnp_service_proxy_available_cb
+ */
+static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata)
+{
+	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
+
+	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
+	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_SPROXY_AVAILABLE]) {
+		return;
+	}
+	_php_gupnp_service_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_SPROXY_AVAILABLE]);
+	
+	return;
+}
+/* }}} */
+
+/* {{{ _php_gupnp_service_proxy_unavailable_cb
+ */
+static void _php_gupnp_service_proxy_unavailable_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata)
+{
+	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
+	
+	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
+	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_SPROXY_UNAVAILABLE]) {
+		return;
+	}
+	_php_gupnp_service_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_SPROXY_UNAVAILABLE]);
+	
+	return;
+}
+/* }}} */
+
+/* {{{ _php_gupnp_device_proxy_cb
+ */
+static void _php_gupnp_device_proxy_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, php_gupnp_callback_t *callback)
+{
+	zval *args[2];
+	php_gupnp_device_proxy_t *dproxy;
+	zval retval;
+	
+	dproxy = emalloc(sizeof(php_gupnp_device_proxy_t));
+	dproxy->proxy = proxy;
+	dproxy->rsrc_id = zend_list_insert(dproxy, le_device_proxy);
+	
+	MAKE_STD_ZVAL(args[0]);
+	ZVAL_RESOURCE(args[0], dproxy->rsrc_id);
+	zend_list_addref(dproxy->rsrc_id);
+	
+	args[1] = callback->arg;
+	args[1]->refcount++;
+	
+	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 2, args TSRMLS_CC) == SUCCESS) {
+		zval_dtor(&retval);
+	}
+	zval_ptr_dtor(&(args[0]));
+	zval_ptr_dtor(&(args[1]));
+
+	return;
+}
+/* }}} */
+
+/* {{{ _php_gupnp_device_proxy_available_cb
+ */
+static void _php_gupnp_device_proxy_available_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, gpointer userdata)
+{
+	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
+
+	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
+	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_DPROXY_AVAILABLE]) {
+		return;
+	}
+	_php_gupnp_device_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_DPROXY_AVAILABLE]);
+	
+	return;
+}
+/* }}} */
+
+/* {{{ _php_gupnp_device_proxy_unavailable_cb
+ */
+static void _php_gupnp_device_proxy_unavailable_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, gpointer userdata)
+{
+	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
+
+	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
+	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_DPROXY_UNAVAILABLE]) {
+		return;
+	}
+	_php_gupnp_device_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_DPROXY_UNAVAILABLE]);
 	
 	return;
 }
@@ -370,39 +521,41 @@ static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const c
 
 /* {{{ _php_gupnp_device_action_cb
  */
-static void _php_gupnp_device_action_cb(GUPnPService *service, GUPnPServiceAction *action, gpointer userdata) {
-	zval *args[2];
-	php_gupnp_service_info_t *service_info = (php_gupnp_service_info_t *)userdata;
+static void _php_gupnp_device_action_cb(GUPnPService *gupnp_service, GUPnPServiceAction *gupnp_action, gpointer userdata) {
+	zval *args[3];
 	php_gupnp_callback_t *callback;
-	php_gupnp_service_action_t *service_action;
+	php_gupnp_service_t *service;
+	php_gupnp_service_action_t *service_action = (php_gupnp_service_action_t *)userdata;
 	zval retval;
 	
-	TSRMLS_FETCH_FROM_CTX(service_info ? service_info->thread_ctx : NULL);
+	TSRMLS_FETCH_FROM_CTX(service_action ? service_action->thread_ctx : NULL);
 	
-	if (!service_info || !service_info->callback) {
+	if (!service_action || !service_action->callback) {
 		return;
 	}
 	
-	service_action = emalloc(sizeof(php_gupnp_service_action_t));
-	service_action->action = action;
-	service_action->rsrc_id = zend_list_insert(service_action, le_service_action);
-	
 	MAKE_STD_ZVAL(args[0]);
-	ZVAL_RESOURCE(args[0], service_action->rsrc_id);
+	service = emalloc(sizeof(php_gupnp_service_t));
+	service->service = gupnp_service;
+	service->rsrc_id = zend_list_insert(service, le_service);
+	ZVAL_RESOURCE(args[0], service->rsrc_id);
+	zend_list_addref(service->rsrc_id);
+	
+	MAKE_STD_ZVAL(args[1]);
+	service_action->action = gupnp_action;
+	ZVAL_RESOURCE(args[1], service_action->rsrc_id);
 	zend_list_addref(service_action->rsrc_id);
 	
-	callback = service_info->callback;
-	args[1] = callback->arg;
-	args[1]->refcount++;
+	callback = service_action->callback;
+	args[2] = callback->arg;
+	args[2]->refcount++;
 	
-	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 2, args TSRMLS_CC) == SUCCESS) {
+	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 3, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
 	}
 	zval_ptr_dtor(&(args[0]));
 	zval_ptr_dtor(&(args[1]));
-	
-	//gupnp_service_action_set(action, "ResultStatus", G_TYPE_BOOLEAN, 1, NULL);
-	//gupnp_service_action_return(action);
+	zval_ptr_dtor(&(args[2]));
 }
 /* }}} */
 
@@ -418,14 +571,14 @@ static gboolean _php_gupnp_service_proxy_send_action(GUPnPServiceProxy *proxy,
 			if (action_type == GUPNP_ACTION_GET) {
 				gboolean value_boolean = 0;
 				
-				result = gupnp_service_proxy_send_action (proxy, action, error, 
+				result = gupnp_service_proxy_send_action(proxy, action, error, 
 							NULL, p_name, G_TYPE_BOOLEAN, &value_boolean, NULL);
 				if (result) {
 					g_value_init(p_value, G_TYPE_BOOLEAN);
 					g_value_set_boolean(p_value, value_boolean);
 				}
 			} else {
-				result = gupnp_service_proxy_send_action (proxy, action, error, 
+				result = gupnp_service_proxy_send_action(proxy, action, error, 
 							p_name, G_TYPE_BOOLEAN, g_value_get_boolean(p_value), NULL, NULL);
 			}
 			break;
@@ -440,7 +593,7 @@ static gboolean _php_gupnp_service_proxy_send_action(GUPnPServiceProxy *proxy,
 					g_value_set_long(p_value, value_long);
 				}
 			} else {
-				result = gupnp_service_proxy_send_action (proxy, action, error, 
+				result = gupnp_service_proxy_send_action(proxy, action, error, 
 							p_name, G_TYPE_LONG, g_value_get_long(p_value), NULL, NULL);
 			}
 			break;
@@ -449,14 +602,14 @@ static gboolean _php_gupnp_service_proxy_send_action(GUPnPServiceProxy *proxy,
 			if (action_type == GUPNP_ACTION_GET) {
 				glong value_double = 0;
 				
-				result = gupnp_service_proxy_send_action (proxy, action, error, 
+				result = gupnp_service_proxy_send_action(proxy, action, error, 
 							NULL, p_name, G_TYPE_DOUBLE, &value_double, NULL);
 				if (result) {
 					g_value_init(p_value, G_TYPE_DOUBLE);
 					g_value_set_double(p_value, value_double);
 				}
 			} else {
-				result = gupnp_service_proxy_send_action (proxy, action, error, 
+				result = gupnp_service_proxy_send_action(proxy, action, error, 
 							p_name, G_TYPE_DOUBLE, g_value_get_double(p_value), NULL, NULL);
 			}
 			break;
@@ -464,14 +617,14 @@ static gboolean _php_gupnp_service_proxy_send_action(GUPnPServiceProxy *proxy,
 		case G_TYPE_STRING:
 			if (action_type == GUPNP_ACTION_GET) {
 				gchar *value_char = NULL;
-				result = gupnp_service_proxy_send_action (proxy, action, error, 
+				result = gupnp_service_proxy_send_action(proxy, action, error, 
 							NULL, p_name, G_TYPE_STRING, value_char, NULL);
 				if (result) {
 					g_value_init(p_value, G_TYPE_STRING);
 					g_value_set_string(p_value, value_char);
 				}
 			} else {
-				result = gupnp_service_proxy_send_action (proxy, action, error, 
+				result = gupnp_service_proxy_send_action(proxy, action, error, 
 							p_name, G_TYPE_STRING, g_value_get_string(p_value), NULL, NULL);
 			}
 			break;
@@ -493,17 +646,32 @@ PHP_MINIT_FUNCTION(gupnp)
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_LONG", G_TYPE_LONG,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_DOUBLE", G_TYPE_DOUBLE,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_STRING", G_TYPE_STRING,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_DPROXY_AVAILABLE", GUPNP_SIGNAL_DPROXY_AVAILABLE,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_DPROXY_UNAVAILABLE", GUPNP_SIGNAL_DPROXY_UNAVAILABLE,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_SPROXY_AVAILABLE", GUPNP_SIGNAL_SPROXY_AVAILABLE,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_SPROXY_UNAVAILABLE", GUPNP_SIGNAL_SPROXY_UNAVAILABLE,  CONST_CS | CONST_PERSISTENT);
 	
 	le_context = zend_register_list_destructors_ex(_php_gupnp_context_dtor, NULL, "context", module_number);
 	le_cpoint = zend_register_list_destructors_ex(_php_gupnp_cpoint_dtor, NULL, "control point", module_number);
 	le_rdevice = zend_register_list_destructors_ex(_php_gupnp_rdevice_dtor, NULL, "root device", module_number);
-	le_proxy = zend_register_list_destructors_ex(_php_gupnp_proxy_dtor, NULL, "proxy", module_number);
+	le_service = zend_register_list_destructors_ex(_php_gupnp_service_dtor, NULL, "service", module_number);
+	le_service_proxy = zend_register_list_destructors_ex(_php_gupnp_service_proxy_dtor, NULL, "service proxy", module_number);
+	le_device_proxy = zend_register_list_destructors_ex(_php_gupnp_device_proxy_dtor, NULL, "device proxy", module_number);
 	le_service_info = zend_register_list_destructors_ex(_php_gupnp_service_info_dtor, NULL, "service info", module_number);
 	le_service_action = zend_register_list_destructors_ex(_php_gupnp_service_action_dtor, NULL, "service action", module_number);
 	
 	/* Required initialisation */
 	g_thread_init(NULL);
 	g_type_init();
+	
+#ifdef ZTS     
+	ts_allocate_id(&gupnp_globals_id, 
+		sizeof(zend_gupnp_globals), 
+		(ts_allocate_ctor)_php_gupnp_globals_ctor, 
+		(ts_allocate_dtor)_php_gupnp_globals_dtor); 
+#else 
+		_php_gupnp_globals_ctor(&gupnp_globals TSRMLS_CC); 
+#endif 
 	
 	return SUCCESS;
 }
@@ -516,12 +684,18 @@ PHP_MSHUTDOWN_FUNCTION(gupnp)
 	/* uncomment this line if you have INI entries
 	UNREGISTER_INI_ENTRIES();
 	*/
+
+#ifndef ZTS
+	_php_gupnp_globals_dtor(&gupnp_globals TSRMLS_CC); 
+#endif 	
 	
 	/* Clean up */
+	/*
 	if (GUPNP_G(main_loop)) {
 		g_main_loop_unref(GUPNP_G(main_loop));
 		
 	}
+	*/
 	/*if (GUPNP_G(context)) {
 		g_object_unref(GUPNP_G(context));
 	}*/
@@ -536,6 +710,8 @@ PHP_MSHUTDOWN_FUNCTION(gupnp)
  */
 PHP_RINIT_FUNCTION(gupnp)
 {
+	//GUPNP_G(main_loop) = g_main_loop_new(NULL, FALSE);
+	
 	return SUCCESS;
 }
 /* }}} */
@@ -545,6 +721,10 @@ PHP_RINIT_FUNCTION(gupnp)
  */
 PHP_RSHUTDOWN_FUNCTION(gupnp)
 {
+	/*if (GUPNP_G(main_loop)) {
+		g_main_loop_unref(GUPNP_G(main_loop));
+	}*/
+	
 	return SUCCESS;
 }
 /* }}} */
@@ -704,33 +884,6 @@ PHP_FUNCTION(gupnp_context_unhost_path)
 }
 /* }}} */
 
-/* {{{ proto resource gupnp_control_point_new(resource context, string target)
-   Create a new Control point with the specified target */
-PHP_FUNCTION(gupnp_control_point_new)
-{
-	char *target = NULL;
-	int target_len;
-	zval *zcontext;
-	php_gupnp_cpoint_t *cpoint = NULL;
-	php_gupnp_context_t *context = NULL;
-	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &zcontext, &target, &target_len) == FAILURE) {
-		return;
-	}
-	
-	ZVAL_TO_CONTEXT(zcontext, context);
-		
-	cpoint = emalloc(sizeof(php_gupnp_cpoint_t));
-	cpoint->cp = gupnp_control_point_new(context->context, target);
-	cpoint->callback = NULL;
-	cpoint->main_loop = NULL;
-	TSRMLS_SET_CTX(cpoint->thread_ctx);
-	cpoint->rsrc_id = zend_list_insert(cpoint, le_cpoint);
-	
-	RETURN_RESOURCE(cpoint->rsrc_id);
-}
-/* }}} */
-
 /* {{{ proto resource gupnp_root_device_new(resource context, string location)
    Create a new root device, automatically downloading and parsing location. */
 PHP_FUNCTION(gupnp_root_device_new)
@@ -749,13 +902,48 @@ PHP_FUNCTION(gupnp_root_device_new)
 		
 	rdevice = emalloc(sizeof(php_gupnp_rdevice_t));
 	rdevice->rd = gupnp_root_device_new(context->context, location);
+	rdevice->main_loop = g_main_loop_new(NULL, FALSE);
+	rdevice->rsrc_id = zend_list_insert(rdevice, le_rdevice);
 	
-	if (rdevice->rd) {
-		rdevice->rsrc_id = zend_list_insert(rdevice, le_rdevice);
-		RETURN_RESOURCE(rdevice->rsrc_id);
+	RETURN_RESOURCE(rdevice->rsrc_id);
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_root_device_set_available(resource root_device, bool available)
+   Controls whether or not root_device is available (announcing its presence). */
+PHP_FUNCTION(gupnp_root_device_start)
+{
+	zval *zrdevice;
+	php_gupnp_rdevice_t *rdevice = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zrdevice) == FAILURE) {
+		return;
 	}
-	efree(rdevice);
-	RETURN_FALSE;
+	
+	ZVAL_TO_RDEVICE(zrdevice, rdevice);
+	
+	g_main_loop_run(rdevice->main_loop);
+		
+	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_root_device_set_available(resource root_device, bool available)
+   Controls whether or not root_device is available (announcing its presence). */
+PHP_FUNCTION(gupnp_root_device_stop)
+{
+	zval *zrdevice;
+	php_gupnp_rdevice_t *rdevice = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zrdevice) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_RDEVICE(zrdevice, rdevice);
+	
+	g_main_loop_quit(rdevice->main_loop);
+		
+	RETURN_TRUE;
 }
 /* }}} */
 
@@ -826,11 +1014,71 @@ PHP_FUNCTION(gupnp_root_device_get_relative_location)
    Get info of the device. */
 PHP_FUNCTION(gupnp_device_info_get)
 {
+	zval *zdproxy;
+	php_gupnp_device_proxy_t *dproxy;
+	char *info_data[2][14];
+	int i;
+	SoupURI *url_base;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zdproxy) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_DEVICE_PROXY(zdproxy, dproxy);
+	
+	url_base = (SoupURI *)gupnp_device_info_get_url_base(GUPNP_DEVICE_INFO(dproxy->proxy));
+	
+	info_data[0][0] = "location";
+	info_data[1][0] = (char *)gupnp_device_info_get_location(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][1] = "url_base";
+	info_data[1][1] = soup_uri_to_string(url_base, 1);
+	info_data[0][2] = "udn";
+	info_data[1][2] = (char *)gupnp_device_info_get_udn(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][3] = "device_type";
+	info_data[1][3] = (char *)gupnp_device_info_get_device_type(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][4] = "friendly_name";
+	info_data[1][4] = gupnp_device_info_get_friendly_name(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][5] = "manufacturer";
+	info_data[1][5] = gupnp_device_info_get_manufacturer(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][6] = "manufacturer_url";
+	info_data[1][6] = gupnp_device_info_get_manufacturer_url(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][7] = "model_description";
+	info_data[1][7] = gupnp_device_info_get_model_description(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][8] = "model_name";
+	info_data[1][8] = gupnp_device_info_get_model_name(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][9] = "model_number";
+	info_data[1][9] = gupnp_device_info_get_model_number(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][10] = "model_url";
+	info_data[1][10] = gupnp_device_info_get_model_url(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][11] = "serial_number";
+	info_data[1][11] = gupnp_device_info_get_serial_number(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][12] = "presentation_url";
+	info_data[1][12] = gupnp_device_info_get_presentation_url(GUPNP_DEVICE_INFO(dproxy->proxy));
+	info_data[0][13] = "upc";
+	info_data[1][13] = gupnp_device_info_get_upc(GUPNP_DEVICE_INFO(dproxy->proxy));
+	
+	array_init(return_value);
+	
+	for (i = 0; i <= 13; i++) {
+		if (info_data[1][i]) {
+			add_assoc_string(return_value, info_data[0][i], info_data[1][i], 1);
+		}
+		if ((i >= 4) && (i <= 13)) {
+			g_free(info_data[1][i]);
+		}
+	}
+}
+/* }}} */
+
+/* {{{ proto array gupnp_device_info_get(resource root_device)
+   Get info of the device. */
+/*PHP_FUNCTION(gupnp_device_info_get)
+{
 	zval *zrdevice;
 	php_gupnp_rdevice_t *rdevice = NULL;
 	char *info_data[2][14];
 	int i;
-	SoupURI* url_base;
+	SoupURI *url_base;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zrdevice) == FAILURE) {
 		return;
@@ -838,7 +1086,7 @@ PHP_FUNCTION(gupnp_device_info_get)
 	
 	ZVAL_TO_RDEVICE(zrdevice, rdevice);
 	
-	url_base = gupnp_device_info_get_url_base(GUPNP_DEVICE_INFO(rdevice->rd));
+	url_base = (SoupURI *)gupnp_device_info_get_url_base(GUPNP_DEVICE_INFO(rdevice->rd));
 	
 	info_data[0][0] = "location";
 	info_data[1][0] = (char *)gupnp_device_info_get_location(GUPNP_DEVICE_INFO(rdevice->rd));
@@ -879,7 +1127,7 @@ PHP_FUNCTION(gupnp_device_info_get)
 			g_free(info_data[1][i]);
 		}
 	}
-}
+}*/
 /* }}} */
 
 /* {{{ proto resource gupnp_device_info_get_service(resource root_device, string type)
@@ -918,8 +1166,9 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 	zval *zservice, *zcallback, *zarg = NULL;
 	char *func_name, *action_name;
 	int action_name_len;
-	php_gupnp_callback_t *callback, *old_callback;
+	php_gupnp_callback_t *callback;
 	php_gupnp_service_info_t *service;
+	php_gupnp_service_action_t *service_action;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rsz|z", &zservice, &action_name, &action_name_len, &zcallback, &zarg) == FAILURE) {
 		return;
@@ -945,15 +1194,14 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 	callback->func = zcallback;
 	callback->arg = zarg;
 	
-	old_callback = service->callback;
-	service->callback = callback;
+	service_action = emalloc(sizeof(php_gupnp_service_action_t));
+	service_action->action = NULL;
+	service_action->callback = callback;
+	service_action->rsrc_id = zend_list_insert(service_action, le_service_action);
+	TSRMLS_SET_CTX(service_action->thread_ctx);
 	
-	g_signal_connect(service->service_info, action_name, G_CALLBACK(_php_gupnp_device_action_cb), service);
+	g_signal_connect(service->service_info, action_name, G_CALLBACK(_php_gupnp_device_action_cb), service_action);
 	
-	if (old_callback) {
-		_php_gupnp_callback_free(old_callback);
-	}
-
 	RETURN_TRUE;
 }
 /* }}} */
@@ -962,10 +1210,7 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
    Get the IP address we advertise ourselves as using. */
 PHP_FUNCTION(gupnp_main_loop_run)
 {
-	main_loop = g_main_loop_new (NULL, FALSE);
-	printf("before g_main_loop_run (main_loop)\n");
-  	g_main_loop_run (main_loop);
-	printf("g_main_loop_run (main_loop) started\n");
+  	//g_main_loop_run(GUPNP_G(main_loop));
 }
 /* }}} */
 
@@ -973,22 +1218,53 @@ PHP_FUNCTION(gupnp_main_loop_run)
    Get the IP address we advertise ourselves as using. */
 PHP_FUNCTION(gupnp_main_loop_stop)
 {
-	printf("before gupnp_main_loop_stop (main_loop)\n");
-	g_main_loop_unref(main_loop);
-	printf("gupnp_main_loop_stop (main_loop) finished\n");
+	//g_main_loop_unref(GUPNP_G(main_loop));
+	//g_main_loop_quit(GUPNP_G(main_loop));
+}
+/* }}} */
+
+/* {{{ proto resource gupnp_control_point_new(resource context, string target)
+   Create a new Control point with the specified target */
+PHP_FUNCTION(gupnp_control_point_new)
+{
+	char *target = NULL;
+	int target_len, i;
+	zval *zcontext;
+	php_gupnp_cpoint_t *cpoint = NULL;
+	php_gupnp_context_t *context = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &zcontext, &target, &target_len) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_CONTEXT(zcontext, context);
+		
+	cpoint = emalloc(sizeof(php_gupnp_cpoint_t));
+	cpoint->cp = gupnp_control_point_new(context->context, target);
+	cpoint->main_loop = g_main_loop_new(NULL, FALSE);
+	TSRMLS_SET_CTX(cpoint->thread_ctx);
+	
+	for (i = 0; i < 4; i++) {
+		cpoint->callbacks[i] = NULL;
+	}
+	
+	cpoint->rsrc_id = zend_list_insert(cpoint, le_cpoint);
+	
+	RETURN_RESOURCE(cpoint->rsrc_id);
 }
 /* }}} */
 
 /* {{{ proto bool gupnp_browse_service(resource cpoint, mixed callback[, mixed arg])
    Starts the search and calls user-defined callback. */
-PHP_FUNCTION(gupnp_browse_service)
+PHP_FUNCTION(gupnp_control_point_callback_set)
 {
 	zval *zcpoint, *zcallback, *zarg = NULL;
 	char *func_name;
-	php_gupnp_callback_t *callback, *old_callback;
+	int signal;
+	php_gupnp_callback_t *callback, *old_callback = NULL;
 	php_gupnp_cpoint_t *cpoint = NULL;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rz|z", &zcpoint, &zcallback, &zarg) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rlz|z", &zcpoint, &signal, &zcallback, &zarg) == FAILURE) {
 		return;
 	}
 	
@@ -1012,23 +1288,73 @@ PHP_FUNCTION(gupnp_browse_service)
 	callback->func = zcallback;
 	callback->arg = zarg;
 	
-	old_callback = cpoint->callback;
-	cpoint->callback = callback;
+	if ((signal < 0) || (signal > 3)) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%d' is not a valid signal", signal);
+		RETURN_FALSE;
+	}
 	
-	cpoint->main_loop = g_main_loop_new(NULL, FALSE);
+	old_callback = cpoint->callbacks[signal];
+	cpoint->callbacks[signal] = callback;
 	
-	g_signal_connect(cpoint->cp, "service-proxy-available", 
-					 G_CALLBACK(_php_gupnp_service_proxy_available_cb), cpoint);
-	
-	/* Tell the Control Point to start searching */
-	gssdp_resource_browser_set_active(GSSDP_RESOURCE_BROWSER(cpoint->cp), TRUE);
-  
-	g_main_loop_run(cpoint->main_loop);
+	if (signal == GUPNP_SIGNAL_DPROXY_AVAILABLE) {
+		g_signal_connect(cpoint->cp, "device-proxy-available", 
+			G_CALLBACK(_php_gupnp_device_proxy_available_cb), cpoint);
+	} else if (signal == GUPNP_SIGNAL_DPROXY_UNAVAILABLE) {
+		g_signal_connect(cpoint->cp, "device-proxy-unavailable", 
+			G_CALLBACK(_php_gupnp_device_proxy_unavailable_cb), cpoint);
+	} else if (signal == GUPNP_SIGNAL_SPROXY_AVAILABLE) {
+		g_signal_connect(cpoint->cp, "service-proxy-available", 
+			G_CALLBACK(_php_gupnp_service_proxy_available_cb), cpoint);
+	} else if (signal == GUPNP_SIGNAL_SPROXY_UNAVAILABLE) {
+		g_signal_connect(cpoint->cp, "service-proxy-unavailable", 
+			G_CALLBACK(_php_gupnp_service_proxy_unavailable_cb), cpoint);
+	}
 	
 	if (old_callback) {
 		_php_gupnp_callback_free(old_callback);
 	}
 
+	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_browse_service(resource cpoint, mixed callback[, mixed arg])
+   Starts the search and calls user-defined callback. */
+PHP_FUNCTION(gupnp_control_point_browse_start)
+{
+	zval *zcpoint;
+	php_gupnp_cpoint_t *cpoint = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zcpoint) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_CPOINT(zcpoint, cpoint);
+	
+	/* Tell the Control Point to start searching */
+	gssdp_resource_browser_set_active(GSSDP_RESOURCE_BROWSER(cpoint->cp), TRUE);
+  
+	g_main_loop_run(cpoint->main_loop);
+
+	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_browse_service(resource cpoint, mixed callback[, mixed arg])
+   Starts the search and calls user-defined callback. */
+PHP_FUNCTION(gupnp_control_point_browse_stop)
+{
+	zval *zcpoint;
+	php_gupnp_cpoint_t *cpoint = NULL;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zcpoint) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_CPOINT(zcpoint, cpoint);
+	
+	g_main_loop_quit(cpoint->main_loop);
+  
 	RETURN_TRUE;
 }
 /* }}} */
@@ -1047,9 +1373,9 @@ PHP_FUNCTION(gupnp_service_info_get)
 		return;
 	}
 	
-	ZVAL_TO_PROXY(zproxy, sproxy);
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
 	
-	url_base = gupnp_service_info_get_url_base(GUPNP_SERVICE_INFO(sproxy->proxy));
+	url_base = (SoupURI *)gupnp_service_info_get_url_base(GUPNP_SERVICE_INFO(sproxy->proxy));
 	
 	info_data[0][0] = "location";
 	info_data[1][0] = (char *)gupnp_service_info_get_location(GUPNP_SERVICE_INFO(sproxy->proxy));
@@ -1100,7 +1426,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_set)
 		return;
 	}
 	
-	ZVAL_TO_PROXY(zproxy, sproxy);
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
 	
 	switch (param_type) {
 		case G_TYPE_BOOLEAN:
@@ -1182,7 +1508,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 		return;
 	}
 	
-	ZVAL_TO_PROXY(zproxy, sproxy);
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
 	
 	result = _php_gupnp_service_proxy_send_action (sproxy->proxy, action, &error, 
 				param_name, param_type, &value, GUPNP_ACTION_GET);
@@ -1225,7 +1551,7 @@ PHP_FUNCTION(gupnp_service_proxy_set_subscribed)
 		return;
 	}
 	
-	ZVAL_TO_PROXY(zproxy, sproxy);
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
 		
 	if (zsubscribed) { 
 		subscribed = TRUE;
@@ -1246,7 +1572,7 @@ PHP_FUNCTION(gupnp_service_proxy_get_subscribed)
 		return;
 	}
 	
-	ZVAL_TO_PROXY(zproxy, sproxy);
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
 		
 	if (gupnp_service_proxy_get_subscribed(sproxy->proxy)) { 
 		RETURN_TRUE;
@@ -1270,7 +1596,7 @@ PHP_FUNCTION(gupnp_service_proxy_add_notify)
 		return;
 	}
 	
-	ZVAL_TO_PROXY(zproxy, sproxy);
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
 		
 	if (!zend_is_callable(zcallback, 0, &func_name)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
@@ -1279,14 +1605,12 @@ PHP_FUNCTION(gupnp_service_proxy_add_notify)
 	}
 	efree(func_name);
 	
-	
 	zval_add_ref(&zcallback);
 	if (zarg) {
 		zval_add_ref(&zarg);
 	} else {
 		ALLOC_INIT_ZVAL(zarg);
 	}
-	
 	
 	callback = emalloc(sizeof(php_gupnp_callback_t));
 	callback->func = zcallback;
@@ -1319,7 +1643,7 @@ PHP_FUNCTION(gupnp_service_proxy_remove_notify)
 		return;
 	}
 	
-	ZVAL_TO_PROXY(zproxy, sproxy);
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
 		
 	if (!gupnp_service_proxy_remove_notify(sproxy->proxy, param_val, _php_gupnp_service_proxy_notify_cb, sproxy)) {
     	RETURN_FALSE;
@@ -1343,7 +1667,7 @@ PHP_FUNCTION(gupnp_service_action_set)
 		return;
 	}
 	
-	ZVAL_TO_ACTION(zaction, service_action);
+	ZVAL_TO_SERVICE_ACTION(zaction, service_action);
 	
 	switch (param_type) {
 		case G_TYPE_BOOLEAN:
@@ -1395,6 +1719,118 @@ PHP_FUNCTION(gupnp_service_action_set)
 
 /* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
    Sends action with parameters to the service exposed by proxy synchronously and set value. */
+PHP_FUNCTION(gupnp_service_action_get)
+{
+	zval *zaction;
+	char *param_name;
+	int param_name_len;
+	long param_type;
+	php_gupnp_service_action_t *service_action;
+	
+	GValue g_value = {0};
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rsl", 
+			&zaction, &param_name, &param_name_len, &param_type) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_SERVICE_ACTION(zaction, service_action);
+	
+	switch (param_type) {
+		case G_TYPE_BOOLEAN:
+			g_value_init(&g_value, G_TYPE_BOOLEAN);
+			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
+			RETURN_BOOL(g_value_get_boolean(&g_value));
+
+		case G_TYPE_LONG:
+			g_value_init(&g_value, G_TYPE_LONG);
+			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
+			RETURN_LONG(g_value_get_long(&g_value));
+		
+		case G_TYPE_DOUBLE: 
+			g_value_init(&g_value, G_TYPE_DOUBLE);
+			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
+			RETURN_DOUBLE(g_value_get_double(&g_value));
+			
+		case G_TYPE_STRING: 
+			g_value_init(&g_value, G_TYPE_STRING);
+			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
+			RETURN_STRING((char *)g_value_get_string(&g_value), 1);
+
+		default: 
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_type' is not correctly defined");
+			return;
+	}
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
+   Sends action with parameters to the service exposed by proxy synchronously and set value. */
+PHP_FUNCTION(gupnp_service_notify)
+{
+	zval *zservice, *param_val;
+	char *param_name;
+	int param_name_len;
+	long param_type;
+	php_gupnp_service_t *service;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rslz", 
+			&zservice, &param_name, &param_name_len, &param_type, &param_val) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_SERVICE(zservice, service);
+	
+	switch (param_type) {
+		case G_TYPE_BOOLEAN:
+			if (Z_TYPE_P(param_val) == IS_BOOL) {
+				gupnp_service_notify(service->service, param_name, param_type, Z_BVAL_P(param_val), NULL);
+				RETURN_TRUE;
+			} else {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' must be boolean");
+				return;
+			}
+			break; 
+		
+		case G_TYPE_LONG:
+			if (Z_TYPE_P(param_val) == IS_LONG) {
+				gupnp_service_notify(service->service, param_name, param_type, Z_LVAL_P(param_val), NULL);
+				RETURN_TRUE;
+			} else {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' must be integer");
+				return;
+			}
+			break; 
+		
+		case G_TYPE_DOUBLE: 
+			if (Z_TYPE_P(param_val) == IS_DOUBLE) {
+				gupnp_service_notify(service->service, param_name, param_type, Z_DVAL_P(param_val), NULL);
+				RETURN_TRUE;
+			} else {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' must be float");
+				return;
+			}
+			break; 
+			
+		case G_TYPE_STRING: 
+			if (Z_TYPE_P(param_val) == IS_STRING) {
+				gupnp_service_notify(service->service, param_name, param_type, Z_STRVAL_P(param_val), NULL);
+				RETURN_TRUE;
+			} else {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' must be string");
+				return;
+			}
+			break; 
+
+		default: 
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_type' is not correctly defined");
+			return;
+	}
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
+   Sends action with parameters to the service exposed by proxy synchronously and set value. */
 PHP_FUNCTION(gupnp_service_action_return)
 {
 	zval *zaction;
@@ -1404,7 +1840,7 @@ PHP_FUNCTION(gupnp_service_action_return)
 		return;
 	}
 	
-	ZVAL_TO_ACTION(zaction, service_action);
+	ZVAL_TO_SERVICE_ACTION(zaction, service_action);
 	
 	gupnp_service_action_return(service_action->action);
 	RETURN_TRUE;

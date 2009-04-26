@@ -1,13 +1,15 @@
 <?php
 
-//phpinfo();
+$GLOBALS['status'] = false;
 
-function action_cb($action, $arg)
+function action_getstatus_cb($service, $action, $arg)
 {
 	echo "=========================================================\n";
-	echo "[CALL] action_cb()\n";
+	echo "[CALL] action_getstatus_cb()\n";
 	echo "---------------------------------------------------------\n";
 	
+	echo "[SERVICE]: ";
+	var_dump($service);
 	echo "[ACTION]: ";
 	var_dump($action);
 	echo "[ARG]: ";
@@ -28,16 +30,52 @@ function action_cb($action, $arg)
 	echo "[RESULT]: ";
 	var_dump($res);
 	echo "---------------------------------------------------------\n\n";
+
+	echo "=========================================================\n\n\n";
+}
+
+function action_settarget_cb($service, $action, $arg)
+{
+	echo "=========================================================\n";
+	echo "[CALL] action_settarget_cb()\n";
+	echo "---------------------------------------------------------\n";
 	
+	echo "[SERVICE]: ";
+	var_dump($service);
+	echo "[ACTION]: ";
+	var_dump($action);
+	echo "[ARG]: ";
+	var_dump($arg);
+
 	echo "---------------------------------------------------------\n";
-	echo "[CALL]: gupnp_main_loop_stop() \n";
+	echo "[CALL]: gupnp_service_action_get($action, 'NewTargetValue', GUPNP_TYPE_BOOLEAN) \n";
 	echo "---------------------------------------------------------\n";
-	$res = gupnp_main_loop_stop();
+	$res = gupnp_service_action_get($action, 'NewTargetValue', GUPNP_TYPE_BOOLEAN);
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
+
+	if ($GLOBALS['status'] != $res)
+	{
+		$GLOBALS['status'] = $res;
+	}
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_notify($service, 'Status', GUPNP_TYPE_BOOLEAN, ".$GLOBALS['status'].") \n";
+	echo "---------------------------------------------------------\n";
+	$res = gupnp_service_notify($service, 'Status', GUPNP_TYPE_BOOLEAN, $GLOBALS['status']);
+	echo "[RESULT]: ";
+	var_dump($res);
+	echo "---------------------------------------------------------\n\n";
+
+	echo "---------------------------------------------------------\n";
+	echo "[CALL]: gupnp_service_action_return($action) \n";
+	echo "---------------------------------------------------------\n";
+	$res = gupnp_service_action_return($action);
 	echo "[RESULT]: ";
 	var_dump($res);
 	echo "---------------------------------------------------------\n\n";
 	
-
 	echo "=========================================================\n\n\n";
 }
 
@@ -168,8 +206,8 @@ echo "[RESULT]: ";
 var_dump($service_info);
 echo "=========================================================\n\n\n";
 
-$cb = "action_cb";
-$arg = "action data";
+$cb = "action_getstatus_cb";
+$arg = "action data, GetStatus";
 $action_name = "action-invoked::GetStatus";
 echo "=========================================================\n";
 echo "[CALL]: gupnp_device_action_callback_set($service_info, $action_name, $cb, $arg) \n";
@@ -179,9 +217,23 @@ echo "[RESULT]: ";
 var_dump($result);
 echo "=========================================================\n\n\n";
 
+$cb = "action_settarget_cb";
+$arg = "action data, SetTarget";
+$action_name = "action-invoked::SetTarget";
+echo "=========================================================\n";
+echo "[CALL]: gupnp_device_action_callback_set($service_info, $action_name, $cb, $arg) \n";
+echo "---------------------------------------------------------\n";
+$result = gupnp_device_action_callback_set($service_info, $action_name, $cb, $arg);
+echo "[RESULT]: ";
+var_dump($result);
+echo "=========================================================\n\n\n";
 
-gupnp_main_loop_run();
-sleep(5);
-gupnp_main_loop_stop();
+echo "=========================================================\n";
+echo "[CALL]: gupnp_main_loop_run() \n";
+echo "---------------------------------------------------------\n";
+$result = gupnp_main_loop_run();
+echo "[RESULT]: ";
+var_dump($result);
+echo "=========================================================\n\n\n";
 
 ?>
