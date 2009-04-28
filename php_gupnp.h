@@ -87,6 +87,7 @@ ZEND_END_MODULE_GLOBALS(gupnp)
 #define GUPNP_SIGNAL_DPROXY_UNAVAILABLE 1
 #define GUPNP_SIGNAL_SPROXY_AVAILABLE 2
 #define GUPNP_SIGNAL_SPROXY_UNAVAILABLE 3
+#define GUPNP_SIGNAL_ACTION_INVOKED 4
 
 /* In every utility function you add that needs to use variables 
    in php_gupnp_globals, call TSRMLS_FETCH(); after declaring other 

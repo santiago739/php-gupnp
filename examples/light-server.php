@@ -63,15 +63,15 @@ if (!$service) {
 }
 
 /* Set callback for action GetStatus*/
-gupnp_device_action_callback_set($service, "action-invoked::GetStatus", 
+gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "GetStatus", 
 	"get_status_cb", "action data, GetStatus");
 
 /* Set callback for action GetTarget*/
-gupnp_device_action_callback_set($service, "action-invoked::GetTarget", 
+gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "GetTarget", 
 	"get_target_cb", "action data, GetTarget");
 
 /* Set callback for action SetTarget*/
-gupnp_device_action_callback_set($service, "action-invoked::SetTarget", 
+gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "SetTarget", 
 	"set_target_cb", "action data, SetTarget");
 
 /* Run the main loop */
