@@ -59,16 +59,16 @@ if (!$context) {
 $cp = gupnp_control_point_new($context, "ssdp:all");
 
 gupnp_control_point_callback_set($cp, 
-	GUPNP_SIGNAL_DPROXY_AVAILABLE, 'device_proxy_available_cb');
+	GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE, 'device_proxy_available_cb');
 
 gupnp_control_point_callback_set($cp, 
-	GUPNP_SIGNAL_DPROXY_UNAVAILABLE, 'device_proxy_unavailable_cb');
+	GUPNP_SIGNAL_DEVICE_PROXY_UNAVAILABLE, 'device_proxy_unavailable_cb');
 
 gupnp_control_point_callback_set($cp, 
-	GUPNP_SIGNAL_SPROXY_AVAILABLE, 'service_proxy_available_cb');
+	GUPNP_SIGNAL_SERVICE_PROXY_AVAILABLE, 'service_proxy_available_cb');
 
 gupnp_control_point_callback_set($cp, 
-	GUPNP_SIGNAL_SPROXY_UNAVAILABLE, 'service_proxy_unavailable_cb');
+	GUPNP_SIGNAL_SERVICE_PROXY_UNAVAILABLE, 'service_proxy_unavailable_cb');
 
 /* Start for browsing */
 gupnp_control_point_browse_start($cp);

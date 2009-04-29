@@ -2,20 +2,43 @@
 /* PowerOn */
 function power_on_cb($service, $action, $arg)
 {
+	printf("Call for action:\n");
+	printf("\taction: %s\n", $arg);
 	gupnp_service_action_set($action, 'Power', GUPNP_TYPE_BOOLEAN, true);
+	printf("\tresult: power is ON now.\n\n");
 	gupnp_service_action_return($action);
 }
 
 /* PowerOff */
 function power_off_cb($service, $action, $arg)
 {
+	printf("Call for action:\n");
+	printf("\taction: %s\n", $arg);
 	gupnp_service_action_set($action, 'Power', GUPNP_TYPE_BOOLEAN, false);
+	printf("\tresult: power is OFF now.\n\n");
 	gupnp_service_action_return($action);
 }
 
-/* By default the tv is off */
-$GLOBALS['power'] = false;
-printf("The tv is now %s.\n", $GLOBALS['power'] ? "on" : "off");
+/* SetChannel */
+function set_channel_cb($service, $action, $arg)
+{
+	printf("Call for action:\n");
+	printf("\taction: %s\n", $arg);
+	$GLOBALS['channel'] = gupnp_service_action_get($action, 'Channel', GUPNP_TYPE_LONG);
+	printf("\tresult: channel is %d.\n\n", $GLOBALS['channel']);
+	gupnp_service_action_return($action);
+}
+
+/* GetChannel */
+function get_channel_cb($service, $action, $arg)
+{
+	printf("Call for action:\n");
+	printf("\taction: %s\n\n", $arg);
+	gupnp_service_action_set($action, 'NewChannel', GUPNP_TYPE_LONG, $GLOBALS['channel']);
+	gupnp_service_action_return($action);
+}
+
+$GLOBALS['channel'] = 1;
 
 /* Create the UPnP context */
 $context = gupnp_context_new();
@@ -46,7 +69,7 @@ printf("Change timeout:\n");
 gupnp_context_set_subscription_timeout($context, $subs_timeout + 100);
 printf("\tsubscription timeout: %d\n\n", gupnp_context_get_subscription_timeout($context));
 
-if (!gupnp_root_device_get_available) {
+if (!gupnp_root_device_get_available($dev)) {
 	gupnp_root_device_set_available($dev, true);
 }
 
@@ -60,11 +83,19 @@ if (!$service) {
 
 /* Set callback for action PowerOn*/
 gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "PowerOn", 
-	"power_on_cb", "action data, PowerOn");
+	"power_on_cb", "PowerOn");
 
 /* Set callback for action PowerOff*/
 gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "PowerOff", 
-	"power_off_cb", "action data, PowerOff");
+	"power_off_cb", "PowerOff");
+
+/* Set callback for action SetChannel*/
+gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "SetChannel", 
+	"set_channel_cb", "SetChannel");
+
+/* Set callback for action GetChannel*/
+gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "GetChannel", 
+	"get_channel_cb", "GetChannel");
 
 /* Run the main loop */
 gupnp_root_device_start($dev);

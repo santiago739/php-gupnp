@@ -380,12 +380,11 @@ static void _php_gupnp_service_proxy_cb(GUPnPControlPoint *cp, GUPnPServiceProxy
 static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata)
 {
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
-
 	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
-	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_SPROXY_AVAILABLE]) {
+	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_SERVICE_PROXY_AVAILABLE]) {
 		return;
 	}
-	_php_gupnp_service_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_SPROXY_AVAILABLE] TSRMLS_CC);
+	_php_gupnp_service_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_SERVICE_PROXY_AVAILABLE] TSRMLS_CC);
 	
 	return;
 }
@@ -396,12 +395,11 @@ static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPSe
 static void _php_gupnp_service_proxy_unavailable_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata)
 {
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
-	
 	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
-	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_SPROXY_UNAVAILABLE]) {
+	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_SERVICE_PROXY_UNAVAILABLE]) {
 		return;
 	}
-	_php_gupnp_service_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_SPROXY_UNAVAILABLE] TSRMLS_CC);
+	_php_gupnp_service_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_SERVICE_PROXY_UNAVAILABLE] TSRMLS_CC);
 	
 	return;
 }
@@ -441,12 +439,11 @@ static void _php_gupnp_device_proxy_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *
 static void _php_gupnp_device_proxy_available_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, gpointer userdata)
 {
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
-
 	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
-	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_DPROXY_AVAILABLE]) {
+	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE]) {
 		return;
 	}
-	_php_gupnp_device_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_DPROXY_AVAILABLE] TSRMLS_CC);
+	_php_gupnp_device_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE] TSRMLS_CC);
 	
 	return;
 }
@@ -457,12 +454,11 @@ static void _php_gupnp_device_proxy_available_cb(GUPnPControlPoint *cp, GUPnPDev
 static void _php_gupnp_device_proxy_unavailable_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, gpointer userdata)
 {
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
-
 	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
-	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_DPROXY_UNAVAILABLE]) {
+	if (!cpoint || !cpoint->callbacks[GUPNP_SIGNAL_DEVICE_PROXY_UNAVAILABLE]) {
 		return;
 	}
-	_php_gupnp_device_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_DPROXY_UNAVAILABLE] TSRMLS_CC);
+	_php_gupnp_device_proxy_cb(cp, proxy, cpoint->callbacks[GUPNP_SIGNAL_DEVICE_PROXY_UNAVAILABLE] TSRMLS_CC);
 	
 	return;
 }
@@ -571,11 +567,13 @@ PHP_MINIT_FUNCTION(gupnp)
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_LONG", G_TYPE_LONG,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_DOUBLE", G_TYPE_DOUBLE,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_STRING", G_TYPE_STRING,  CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_DPROXY_AVAILABLE", GUPNP_SIGNAL_DPROXY_AVAILABLE,  CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_DPROXY_UNAVAILABLE", GUPNP_SIGNAL_DPROXY_UNAVAILABLE,  CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_SPROXY_AVAILABLE", GUPNP_SIGNAL_SPROXY_AVAILABLE,  CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_SPROXY_UNAVAILABLE", GUPNP_SIGNAL_SPROXY_UNAVAILABLE,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE", GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_DEVICE_PROXY_UNAVAILABLE", GUPNP_SIGNAL_DEVICE_PROXY_UNAVAILABLE,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_SERVICE_PROXY_AVAILABLE", GUPNP_SIGNAL_SERVICE_PROXY_AVAILABLE,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_SERVICE_PROXY_UNAVAILABLE", GUPNP_SIGNAL_SERVICE_PROXY_UNAVAILABLE,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_ACTION_INVOKED", GUPNP_SIGNAL_ACTION_INVOKED,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_NOTIFY_FAILED", GUPNP_SIGNAL_NOTIFY_FAILED,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_QUERY_VARIABLE", GUPNP_SIGNAL_QUERY_VARIABLE,  CONST_CS | CONST_PERSISTENT);
 	
 	le_context = zend_register_list_destructors_ex(_php_gupnp_context_dtor, NULL, "context", module_number);
 	le_cpoint = zend_register_list_destructors_ex(_php_gupnp_cpoint_dtor, NULL, "control point", module_number);
@@ -1029,7 +1027,7 @@ PHP_FUNCTION(gupnp_device_info_get_service)
 PHP_FUNCTION(gupnp_device_action_callback_set)
 {
 	zval *zservice, *zcallback, *zarg = NULL;
-	char *func_name, *action_name, *action_name_full;
+	char *func_name, *action_name, *action_name_full, *signal_name;
 	int action_name_len;
 	int signal;
 	php_gupnp_callback_t *callback;
@@ -1040,9 +1038,23 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 		return;
 	}
 	
-	if (signal != GUPNP_SIGNAL_ACTION_INVOKED) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Not valid signal");
-		RETURN_FALSE;
+	switch (signal) {
+		case GUPNP_SIGNAL_ACTION_INVOKED:
+			signal_name = "action-invoked::";
+			break;
+			
+		case GUPNP_SIGNAL_NOTIFY_FAILED:
+			signal_name = "notify-failed::";
+			break;
+			
+		case GUPNP_SIGNAL_QUERY_VARIABLE:
+			signal_name = "query-variable::";
+			break;
+			
+		default:
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Not valid signal");
+			RETURN_FALSE;
+			break;
 	}
 		
 	ZVAL_TO_SERVICE_INFO(zservice, service);
@@ -1071,11 +1083,9 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 	service_action->rsrc_id = zend_list_insert(service_action, le_service_action);
 	TSRMLS_SET_CTX(service_action->thread_ctx);
 	
-	//action_name_full = strdup("action-invoked::");
-	action_name_full = emalloc(strlen("action-invoked::") + action_name_len);
-	strcpy(action_name_full, "action-invoked::");
+	action_name_full = emalloc(strlen(signal_name) + action_name_len);
+	strcpy(action_name_full, signal_name);
 	strcat(action_name_full, action_name);
-	//printf("%s\n", action_name_full);
 
 	g_signal_connect(service->service_info, action_name_full, G_CALLBACK(_php_gupnp_device_action_cb), service_action);
 	
@@ -1161,28 +1171,32 @@ PHP_FUNCTION(gupnp_control_point_callback_set)
 		ALLOC_INIT_ZVAL(zarg);
 	}
 	
-	callback = emalloc(sizeof(php_gupnp_callback_t));
-	callback->func = zcallback;
-	callback->arg = zarg;
-	
-	if ((signal < 0) || (signal > 3)) {
+	//if ((signal < 0) || (signal > 3)) {
+	if (signal != GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE
+		&& signal != GUPNP_SIGNAL_DEVICE_PROXY_UNAVAILABLE
+		&& signal != GUPNP_SIGNAL_SERVICE_PROXY_AVAILABLE
+		&& signal != GUPNP_SIGNAL_SERVICE_PROXY_UNAVAILABLE) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%d' is not a valid signal", signal);
 		RETURN_FALSE;
 	}
 	
+	callback = emalloc(sizeof(php_gupnp_callback_t));
+	callback->func = zcallback;
+	callback->arg = zarg;
+	
 	old_callback = cpoint->callbacks[signal];
 	cpoint->callbacks[signal] = callback;
 	
-	if (signal == GUPNP_SIGNAL_DPROXY_AVAILABLE) {
+	if (signal == GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE) {
 		g_signal_connect(cpoint->cp, "device-proxy-available", 
 			G_CALLBACK(_php_gupnp_device_proxy_available_cb), cpoint);
-	} else if (signal == GUPNP_SIGNAL_DPROXY_UNAVAILABLE) {
+	} else if (signal == GUPNP_SIGNAL_DEVICE_PROXY_UNAVAILABLE) {
 		g_signal_connect(cpoint->cp, "device-proxy-unavailable", 
 			G_CALLBACK(_php_gupnp_device_proxy_unavailable_cb), cpoint);
-	} else if (signal == GUPNP_SIGNAL_SPROXY_AVAILABLE) {
+	} else if (signal == GUPNP_SIGNAL_SERVICE_PROXY_AVAILABLE) {
 		g_signal_connect(cpoint->cp, "service-proxy-available", 
 			G_CALLBACK(_php_gupnp_service_proxy_available_cb), cpoint);
-	} else if (signal == GUPNP_SIGNAL_SPROXY_UNAVAILABLE) {
+	} else if (signal == GUPNP_SIGNAL_SERVICE_PROXY_UNAVAILABLE) {
 		g_signal_connect(cpoint->cp, "service-proxy-unavailable", 
 			G_CALLBACK(_php_gupnp_service_proxy_unavailable_cb), cpoint);
 	}

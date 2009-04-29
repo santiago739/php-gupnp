@@ -44,8 +44,8 @@ if (!$context) {
 }
 
 /* Host the device and service description files */
-$local_path_1 = $_SERVER["PWD"] . "/ext/gupnp/examples/BinaryLight1.xml";
-$local_path_2 = $_SERVER["PWD"] . "/ext/gupnp/examples/SwitchPower1.xml";
+$local_path_1 = "./BinaryLight1.xml";
+$local_path_2 = "./SwitchPower1.xml";
 $server_path_1 = "/BinaryLight1.xml";
 $server_path_2 = "/SwitchPower1.xml";
 gupnp_context_host_path($context, $local_path_1, $server_path_1);
