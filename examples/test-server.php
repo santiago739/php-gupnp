@@ -1,4 +1,5 @@
 <?php
+
 /* PowerOn */
 function power_on_cb($service, $action, $arg)
 {
@@ -24,17 +25,14 @@ function set_channel_cb($service, $action, $arg)
 {
 	printf("Call for action:\n");
 	printf("\taction: %s\n", $arg);
-	$GLOBALS['channel'] = gupnp_service_action_get($action, 'Channel', GUPNP_TYPE_LONG);
-	printf("\tresult: channel is %d.\n\n", $GLOBALS['channel']);
-	gupnp_service_action_return($action);
-}
-
-/* GetChannel */
-function get_channel_cb($service, $action, $arg)
-{
-	printf("Call for action:\n");
-	printf("\taction: %s\n\n", $arg);
-	gupnp_service_action_set($action, 'NewChannel', GUPNP_TYPE_LONG, $GLOBALS['channel']);
+	$target = gupnp_service_action_get($action, 'Channel', GUPNP_TYPE_LONG);
+	
+	if ($target != $GLOBALS['channel']) {
+		$GLOBALS['channel'] = $target;
+		gupnp_service_notify($service, 'Channel', GUPNP_TYPE_LONG, $GLOBALS['channel']);
+		printf("\tresult: channel has been changed to %d.\n", $GLOBALS['channel']);
+	}
+	printf("\n");
 	gupnp_service_action_return($action);
 }
 
@@ -92,10 +90,6 @@ gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "PowerOf
 /* Set callback for action SetChannel*/
 gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "SetChannel", 
 	"set_channel_cb", "SetChannel");
-
-/* Set callback for action GetChannel*/
-gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "GetChannel", 
-	"get_channel_cb", "GetChannel");
 
 /* Run the main loop */
 gupnp_root_device_start($dev);

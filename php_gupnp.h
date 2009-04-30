@@ -74,6 +74,8 @@ PHP_FUNCTION(gupnp_service_proxy_remove_notify);
 PHP_FUNCTION(gupnp_service_action_set);
 PHP_FUNCTION(gupnp_service_action_get);
 PHP_FUNCTION(gupnp_service_notify);
+PHP_FUNCTION(gupnp_service_freeze_notify);
+PHP_FUNCTION(gupnp_service_thaw_notify);
 PHP_FUNCTION(gupnp_service_action_return);
 
 ZEND_BEGIN_MODULE_GLOBALS(gupnp)

@@ -101,7 +101,6 @@ typedef struct _php_gupnp_service_action_t { /* {{{ */
 } php_gupnp_service_action_t;
 /* }}} */
 
-/* True global resources - no need for thread safety here */
 static int le_context;
 static int le_cpoint;
 static int le_rdevice;
@@ -173,6 +172,8 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_service_action_set, 	NULL)
 	PHP_FE(gupnp_service_action_get, 	NULL)
 	PHP_FE(gupnp_service_notify, 	NULL)
+	PHP_FE(gupnp_service_freeze_notify, 	NULL)
+	PHP_FE(gupnp_service_thaw_notify, 	NULL)
 	PHP_FE(gupnp_service_action_return, 	NULL)
 	{NULL, NULL, NULL}	/* Must be the last line in gupnp_functions[] */
 };
@@ -731,7 +732,7 @@ PHP_FUNCTION(gupnp_context_get_port)
 /* }}} */
 
 /* {{{ proto void gupnp_context_set_subscription_timeout(resource context, int timeout)
-   Sets the event subscription timeout to timeout. 
+   Sets the event subscription timeout (in seconds) to time out. 
    Use 0 if you don't want subscriptions to time out. 
    Note that any client side subscriptions will automatically be renewed. */
 PHP_FUNCTION(gupnp_context_set_subscription_timeout)
@@ -834,7 +835,7 @@ PHP_FUNCTION(gupnp_root_device_new)
 /* }}} */
 
 /* {{{ proto bool gupnp_root_device_start(resource root_device)
-   Start root server's loop. */
+   Start root server's main loop. */
 PHP_FUNCTION(gupnp_root_device_start)
 {
 	zval *zrdevice;
@@ -851,8 +852,8 @@ PHP_FUNCTION(gupnp_root_device_start)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_root_device_set_available(resource root_device, bool available)
-   Controls whether or not root_device is available (announcing its presence). */
+/* {{{ proto bool gupnp_root_device_stop(resource root_device)
+   Stop root server's main loop. */
 PHP_FUNCTION(gupnp_root_device_stop)
 {
 	zval *zrdevice;
@@ -913,8 +914,8 @@ PHP_FUNCTION(gupnp_root_device_get_available)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_root_device_get_available(resource root_device)
-   Get whether or not root_device is available (announcing its presence). */
+/* {{{ proto string gupnp_root_device_get_relative_location(resource root_device)
+   Get the relative location of root_device. */
 PHP_FUNCTION(gupnp_root_device_get_relative_location)
 {
 	char *location;
@@ -934,7 +935,7 @@ PHP_FUNCTION(gupnp_root_device_get_relative_location)
 /* }}} */
 
 /* {{{ proto array gupnp_device_info_get(resource root_device)
-   Get info of the device. */
+   Get info of root_device. */
 PHP_FUNCTION(gupnp_device_info_get)
 {
 	zval *zdproxy;
@@ -1022,8 +1023,8 @@ PHP_FUNCTION(gupnp_device_info_get_service)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_device_action_callback_set(resource root_device, string type)
-   Get the service with type or false if no such device was found.  */
+/* {{{ proto bool gupnp_device_action_callback_set(resource root_device, int signal, string action_name, mixed callback[, mixed arg]) 
+   Set device callback function for signal and action.  */
 PHP_FUNCTION(gupnp_device_action_callback_set)
 {
 	zval *zservice, *zcallback, *zarg = NULL;
@@ -1093,23 +1094,6 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 }
 /* }}} */
 
-/* {{{ proto string gupnp_context_get_host_ip(resource context)
-   Get the IP address we advertise ourselves as using. */
-PHP_FUNCTION(gupnp_main_loop_run)
-{
-  	//g_main_loop_run(GUPNP_G(main_loop));
-}
-/* }}} */
-
-/* {{{ proto string gupnp_context_get_host_ip(resource context)
-   Get the IP address we advertise ourselves as using. */
-PHP_FUNCTION(gupnp_main_loop_stop)
-{
-	//g_main_loop_unref(GUPNP_G(main_loop));
-	//g_main_loop_quit(GUPNP_G(main_loop));
-}
-/* }}} */
-
 /* {{{ proto resource gupnp_control_point_new(resource context, string target)
    Create a new Control point with the specified target */
 PHP_FUNCTION(gupnp_control_point_new)
@@ -1141,8 +1125,8 @@ PHP_FUNCTION(gupnp_control_point_new)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_browse_service(resource cpoint, mixed callback[, mixed arg])
-   Starts the search and calls user-defined callback. */
+/* {{{ proto bool gupnp_browse_service(resource cpoint, int signal, mixed callback[, mixed arg])
+   Set control point callback function for signal. */
 PHP_FUNCTION(gupnp_control_point_callback_set)
 {
 	zval *zcpoint, *zcallback, *zarg = NULL;
@@ -1209,7 +1193,7 @@ PHP_FUNCTION(gupnp_control_point_callback_set)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_browse_service(resource cpoint, mixed callback[, mixed arg])
+/* {{{ proto bool gupnp_control_point_browse_start(resource cpoint)
    Starts the search and calls user-defined callback. */
 PHP_FUNCTION(gupnp_control_point_browse_start)
 {
@@ -1222,7 +1206,6 @@ PHP_FUNCTION(gupnp_control_point_browse_start)
 	
 	ZVAL_TO_CPOINT(zcpoint, cpoint);
 	
-	/* Tell the Control Point to start searching */
 	gssdp_resource_browser_set_active(GSSDP_RESOURCE_BROWSER(cpoint->cp), TRUE);
   
 	g_main_loop_run(cpoint->main_loop);
@@ -1231,8 +1214,8 @@ PHP_FUNCTION(gupnp_control_point_browse_start)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_browse_service(resource cpoint, mixed callback[, mixed arg])
-   Starts the search and calls user-defined callback. */
+/* {{{ proto bool gupnp_control_point_browse_stop(resource cpoint)
+   Stop the search and calls user-defined callback. */
 PHP_FUNCTION(gupnp_control_point_browse_stop)
 {
 	zval *zcpoint;
@@ -1251,7 +1234,7 @@ PHP_FUNCTION(gupnp_control_point_browse_stop)
 /* }}} */
 
 /* {{{ proto array gupnp_service_info_get(resource proxy)
-   Get info of the service. */
+   Get info of service. */
 PHP_FUNCTION(gupnp_service_info_get)
 {
 	zval *zproxy;
@@ -1564,8 +1547,8 @@ PHP_FUNCTION(gupnp_service_proxy_remove_notify)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
-   Sends action with parameters to the service exposed by proxy synchronously and set value. */
+/* {{{ proto bool gupnp_service_action_set(resource action, string name, int type, mixed value)
+   Sets the specified action return values. */
 PHP_FUNCTION(gupnp_service_action_set)
 {
 	zval *zaction, *param_val;
@@ -1629,8 +1612,8 @@ PHP_FUNCTION(gupnp_service_action_set)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
-   Sends action with parameters to the service exposed by proxy synchronously and set value. */
+/* {{{ proto mixed gupnp_service_action_get(resource action, string name, int type)
+   Retrieves the specified action arguments. */
 PHP_FUNCTION(gupnp_service_action_get)
 {
 	zval *zaction;
@@ -1676,8 +1659,8 @@ PHP_FUNCTION(gupnp_service_action_get)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
-   Sends action with parameters to the service exposed by proxy synchronously and set value. */
+/* {{{ proto bool gupnp_service_notify(resource service, string name, int type, mixed value)
+   Notifies listening clients that the properties listed in Varargs have changed to the specified values. */
 PHP_FUNCTION(gupnp_service_notify)
 {
 	zval *zservice, *param_val;
@@ -1741,8 +1724,47 @@ PHP_FUNCTION(gupnp_service_notify)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
-   Sends action with parameters to the service exposed by proxy synchronously and set value. */
+/* {{{ proto bool gupnp_service_freeze_notify(resource service)
+   Causes new notifications to be queued up until gupnp_service_thaw_notify() is called. */
+PHP_FUNCTION(gupnp_service_freeze_notify)
+{
+	zval *zservice;
+	php_gupnp_service_t *service;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zservice) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_SERVICE(zservice, service);
+	
+	gupnp_service_freeze_notify(service->service);
+	
+	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_service_freeze_notify(resource service)
+   Sends out any pending notifications, and stops queuing of new ones. */
+PHP_FUNCTION(gupnp_service_thaw_notify)
+{
+	zval *zservice;
+	php_gupnp_service_t *service;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zservice) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_SERVICE(zservice, service);
+	
+	gupnp_service_thaw_notify(service->service);
+	
+	RETURN_TRUE;
+}
+/* }}} */
+
+
+/* {{{ proto bool gupnp_service_action_return(resource action)
+   Return succesfully. */
 PHP_FUNCTION(gupnp_service_action_return)
 {
 	zval *zaction;

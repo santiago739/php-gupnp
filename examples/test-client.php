@@ -16,14 +16,27 @@ function tvcontrol_service_proxy_available_cb($proxy, $arg)
 	}
 	printf("\n");
 
+	/* Subscibe to service proxy */
+	$subscribed = gupnp_service_proxy_get_subscribed($proxy);
+	printf("Check subscribed:\n");
+	printf("\tstatus: %s\n", $subscribed ? 'true' : 'false');
+	if (!$subscribed) {
+		printf("Set subscribed\n");
+		gupnp_service_proxy_set_subscribed($proxy, true);
+	}
+	/* Add notify if channel will be changed */
+	if (!gupnp_service_proxy_add_notify ($proxy, "Channel", 
+			GUPNP_TYPE_LONG, "tvcontrol_channel_changed_cb", NULL)) {
+		printf("Failed to add notify\n");
+	}
+	printf("\n");
+
 	if (isset($arg['args']['power'])) {
 		tvcontrol_set_power($proxy, $arg['args']['power']);
 	}
 	if (isset($arg['args']['channel'])) {
 		tvcontrol_set_channel($proxy, $arg['args']['channel']);
 	}
-
-	gupnp_control_point_browse_stop($arg['cp']);
 }
 
 function tvcontrol_service_proxy_unavailable_cb($proxy, $arg)
@@ -63,21 +76,28 @@ function tvcontrol_set_power($proxy, $arg)
 	} else {
 		printf("Set power to %s.\n", $target ? "ON" : "OFF");
 	}
+	printf("\n");
 }
 
 function tvcontrol_set_channel($proxy, $arg)
 {
 	$channel_new = (int)$arg;
 	
-	$channel = gupnp_service_proxy_action_get($proxy, 'GetChannel', 'NewChannel', GUPNP_TYPE_LONG);
-
 	/* Set the target */
 	if (!gupnp_service_proxy_action_set($proxy, 'SetChannel', 'Channel', $channel_new, GUPNP_TYPE_LONG)) {
 		printf("Cannot set channel\n");
 	} else {
-		$channel = gupnp_service_proxy_action_get($proxy, 'GetChannel', 'NewChannel', GUPNP_TYPE_LONG);
-		printf("Set channel to %d.\n", $channel);
+		printf("Set channel to %d.\n", $channel_new);
 	}
+	printf("\n");
+}
+
+function tvcontrol_channel_changed_cb($variable, $value, $arg)
+{
+	printf("Channel has been changed\n");
+	printf("\tvariable name: %s\n", $variable);
+	printf("\tvalue: %s\n", $value);
+	printf("\n");
 }
 
 /* Check and parse command line arguments */
