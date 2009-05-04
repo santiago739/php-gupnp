@@ -32,6 +32,27 @@ function get_status_cb($service, $action, $arg)
 	gupnp_service_action_return($action);
 }
 
+/*
+ * State Variable query handlers
+ */
+
+/* Target */
+function query_target_cb($service, $variable, $value, $arg)
+{
+  //g_value_init (value, G_TYPE_BOOLEAN);
+  //g_value_set_boolean (value, status);
+	printf("[CALL] query_target_cb");
+}
+
+/* Status */
+function query_status_cb($service, $variable, $value, $arg)
+{
+  //g_value_init (value, G_TYPE_BOOLEAN);
+  //g_value_set_boolean (value, status);
+	printf("[CALL] query_status_cb");
+}
+
+
 /* By default the light is off */
 $GLOBALS['status'] = false;
 printf("The light is now %s.\n", $GLOBALS['status'] ? "on" : "off");
@@ -44,8 +65,8 @@ if (!$context) {
 }
 
 /* Host the device and service description files */
-$local_path_1 = $_SERVER["PWD"] . "/ext/gupnp/examples/BinaryLight1.xml";
-$local_path_2 = $_SERVER["PWD"] . "/ext/gupnp/examples/SwitchPower1.xml";
+$local_path_1 = "./BinaryLight1.xml";
+$local_path_2 = "./SwitchPower1.xml";
 $server_path_1 = "/BinaryLight1.xml";
 $server_path_2 = "/SwitchPower1.xml";
 gupnp_context_host_path($context, $local_path_1, $server_path_1);
@@ -62,15 +83,15 @@ if (!$service) {
 	die("Cannot get SwitchPower1 service\n");
 }
 
-/* Set callback for action GetStatus*/
+/* Set callback for action GetStatus */
 gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "GetStatus", 
 	"get_status_cb", "action data, GetStatus");
 
-/* Set callback for action GetTarget*/
+/* Set callback for action GetTarget */
 gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "GetTarget", 
 	"get_target_cb", "action data, GetTarget");
 
-/* Set callback for action SetTarget*/
+/* Set callback for action SetTarget */
 gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "SetTarget", 
 	"set_target_cb", "action data, SetTarget");
 

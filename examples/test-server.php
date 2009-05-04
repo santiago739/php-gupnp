@@ -25,11 +25,12 @@ function set_channel_cb($service, $action, $arg)
 {
 	printf("Call for action:\n");
 	printf("\taction: %s\n", $arg);
-	$target = gupnp_service_action_get($action, 'Channel', GUPNP_TYPE_LONG);
-	
+	$target = gupnp_service_action_get($action, 'Channel', GUPNP_TYPE_INT);
+
 	if ($target != $GLOBALS['channel']) {
 		$GLOBALS['channel'] = $target;
-		gupnp_service_notify($service, 'Channel', GUPNP_TYPE_LONG, $GLOBALS['channel']);
+		printf("Call gupnp_service_notify\n");
+		$result = gupnp_service_notify($service, 'Channel', GUPNP_TYPE_INT, $GLOBALS['channel']);
 		printf("\tresult: channel has been changed to %d.\n", $GLOBALS['channel']);
 	}
 	printf("\n");
@@ -64,7 +65,7 @@ $subs_timeout = gupnp_context_get_subscription_timeout($context);
 printf("\tsubscription timeout: %d\n\n", $subs_timeout);
 
 printf("Change timeout:\n");
-gupnp_context_set_subscription_timeout($context, $subs_timeout + 100);
+gupnp_context_set_subscription_timeout($context, 10);
 printf("\tsubscription timeout: %d\n\n", gupnp_context_get_subscription_timeout($context));
 
 if (!gupnp_root_device_get_available($dev)) {

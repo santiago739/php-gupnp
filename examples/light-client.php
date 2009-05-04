@@ -9,6 +9,19 @@ function service_proxy_available_cb($proxy, $arg)
 {
 	$mode = $arg['mode'];
 
+	printf("Set subscribed\n");
+	gupnp_service_proxy_set_subscribed($proxy, true);
+
+	/* Add notify if status will be changed */
+	if (!gupnp_service_proxy_add_notify($proxy, "Status", 
+			GUPNP_TYPE_BOOLEAN, "status_changed_cb", NULL)) {
+		printf("Failed to add notify\n");
+	}
+	
+	$introspection = gupnp_service_info_get_introspection($proxy);
+	$status_val = gupnp_service_introspection_get_state_variable($introspection, 'Status');
+	var_dump($status_val);
+
 	if ($mode == 'TOGGLE') {
 		/* We're toggling, so first fetch the current status */
 		$target = gupnp_service_proxy_action_get($proxy, 'GetStatus', 'ResultStatus', GUPNP_TYPE_BOOLEAN);
@@ -28,7 +41,15 @@ function service_proxy_available_cb($proxy, $arg)
 		printf("Set switch to %s.\n", $target ? "on" : "off");
 	}
 
-	gupnp_control_point_browse_stop($arg['cp']);
+	//gupnp_control_point_browse_stop($arg['cp']);
+}
+
+function status_changed_cb($variable, $value, $arg)
+{
+	printf("Status has been changed\n");
+	printf("\tvariable name: %s\n", $variable);
+	printf("\tvalue: %s\n", (int)$value);
+	printf("\n");
 }
 
 /* Check and parse command line arguments */
@@ -62,7 +83,7 @@ $cp = gupnp_control_point_new ($context,
 /* Connect to the service-found callback */
 $cb = "service_proxy_available_cb";
 $arg = array('mode' => $mode, 'cp' => $cp);
-gupnp_control_point_callback_set($cp, GUPNP_SIGNAL_SPROXY_AVAILABLE, $cb, $arg);
+gupnp_control_point_callback_set($cp, GUPNP_SIGNAL_SERVICE_PROXY_AVAILABLE, $cb, $arg);
 
 /* Start for browsing */
 gupnp_control_point_browse_start($cp);

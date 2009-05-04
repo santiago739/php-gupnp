@@ -69,6 +69,7 @@ typedef struct _php_gupnp_service_proxy_t { /* {{{ */
 	GUPnPServiceProxy *proxy;
 	int rsrc_id;
 	php_gupnp_callback_t *callback;
+	php_gupnp_callback_t *callback_signal;
 #ifdef ZTS
 	void ***thread_ctx;
 #endif
@@ -91,6 +92,12 @@ typedef struct _php_gupnp_service_info_t { /* {{{ */
 } php_gupnp_service_info_t;
 /* }}} */
 
+typedef struct _php_gupnp_service_introspection_t { /* {{{ */
+	GUPnPServiceIntrospection *introspection;
+	int rsrc_id;
+} php_gupnp_service_introspection_t;
+/* }}} */
+
 typedef struct _php_gupnp_service_action_t { /* {{{ */
 	GUPnPServiceAction *action;
 	int rsrc_id;
@@ -108,6 +115,7 @@ static int le_service;
 static int le_service_proxy;
 static int le_device_proxy;
 static int le_service_info;
+static int le_service_introspection;
 static int le_service_action;
 
 #define ZVAL_TO_CONTEXT(zval, context) \
@@ -130,6 +138,9 @@ static int le_service_action;
 
 #define ZVAL_TO_SERVICE_INFO(zval, service_info) \
 		ZEND_FETCH_RESOURCE(service_info, php_gupnp_service_info_t *, &zval, -1, "service info", le_service_info)
+
+#define ZVAL_TO_SERVICE_INTROSPECTION(zval, service_introspection) \
+		ZEND_FETCH_RESOURCE(service_introspection, php_gupnp_service_introspection_t *, &zval, -1, "service introspection", le_service_introspection)
 
 #define ZVAL_TO_SERVICE_ACTION(zval, service_action) \
 		ZEND_FETCH_RESOURCE(service_action, php_gupnp_service_action_t *, &zval, -1, "service action", le_service_action)
@@ -156,19 +167,20 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_device_info_get,	NULL)
 	PHP_FE(gupnp_device_info_get_service,	NULL)
 	PHP_FE(gupnp_device_action_callback_set,	NULL)
-	PHP_FE(gupnp_main_loop_run,	NULL)
-	PHP_FE(gupnp_main_loop_stop,	NULL)
 	PHP_FE(gupnp_control_point_new,	NULL)
 	PHP_FE(gupnp_control_point_callback_set,	NULL)
 	PHP_FE(gupnp_control_point_browse_start, 	NULL)
 	PHP_FE(gupnp_control_point_browse_stop, 	NULL)
 	PHP_FE(gupnp_service_info_get, 	NULL)
+	PHP_FE(gupnp_service_info_get_introspection, 	NULL)
+	PHP_FE(gupnp_service_introspection_get_state_variable, 	NULL)
 	PHP_FE(gupnp_service_proxy_action_set, 	NULL)
 	PHP_FE(gupnp_service_proxy_action_get, 	NULL)
 	PHP_FE(gupnp_service_proxy_set_subscribed, 	NULL)
 	PHP_FE(gupnp_service_proxy_get_subscribed, 	NULL)
 	PHP_FE(gupnp_service_proxy_add_notify, 	NULL)
 	PHP_FE(gupnp_service_proxy_remove_notify, 	NULL)
+	PHP_FE(gupnp_service_proxy_callback_set, 	NULL)
 	PHP_FE(gupnp_service_action_set, 	NULL)
 	PHP_FE(gupnp_service_action_get, 	NULL)
 	PHP_FE(gupnp_service_notify, 	NULL)
@@ -252,11 +264,8 @@ static inline void _php_gupnp_callback_free(php_gupnp_callback_t *callback) /* {
  */
 static void _php_gupnp_cpoint_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
-	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)rsrc->ptr;
 	int i;
-	
-	//_php_gupnp_callback_free(cpoint->callback);
-	//_php_gupnp_callback_free(cpoint->callback_un);
+	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)rsrc->ptr;
 	
 	for (i = 0; i < 4; i++) {
 		_php_gupnp_callback_free(cpoint->callbacks[i]);
@@ -297,6 +306,7 @@ static void _php_gupnp_service_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) 
 	php_gupnp_service_proxy_t *sproxy = (php_gupnp_service_proxy_t *)rsrc->ptr;
 	
 	_php_gupnp_callback_free(sproxy->callback);
+	_php_gupnp_callback_free(sproxy->callback_signal);
 	efree(sproxy);
 }
 /* }}} */
@@ -334,6 +344,17 @@ static void _php_gupnp_service_info_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /
 }
 /* }}} */
 
+/* {{{ _php_gupnp_service_introspection_dtor
+ */
+static void _php_gupnp_service_introspection_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
+{
+	php_gupnp_service_introspection_t *sintrospection = (php_gupnp_service_introspection_t *)rsrc->ptr;
+	
+	g_object_unref(sintrospection->introspection);
+	efree(sintrospection);
+}
+/* }}} */
+
 /* {{{ _php_gupnp_service_action_dtor
  */
 static void _php_gupnp_service_action_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
@@ -356,6 +377,7 @@ static void _php_gupnp_service_proxy_cb(GUPnPControlPoint *cp, GUPnPServiceProxy
 	sproxy = emalloc(sizeof(php_gupnp_service_proxy_t));
 	sproxy->proxy = proxy;
 	sproxy->callback = NULL;
+	sproxy->callback_signal = NULL;
 	TSRMLS_SET_CTX(sproxy->thread_ctx);
 	sproxy->rsrc_id = zend_list_insert(sproxy, le_service_proxy);
 	
@@ -474,7 +496,6 @@ static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const c
 	php_gupnp_callback_t *callback;
 	zval retval;
 	TSRMLS_FETCH_FROM_CTX(sproxy ? sproxy->thread_ctx : NULL);
-	
 	if (!sproxy || !sproxy->callback) {
 		return;
 	}
@@ -487,15 +508,27 @@ static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const c
 		case G_TYPE_BOOLEAN: 
 			ZVAL_BOOL(args[1], g_value_get_boolean(value));
 			break; 
+			
+		case G_TYPE_INT: 
+			ZVAL_LONG(args[1], g_value_get_int(value));
+			break; 
+			
 		case G_TYPE_LONG: 
 			ZVAL_LONG(args[1], g_value_get_long(value));
 			break; 
+			
+		case G_TYPE_FLOAT:
+			ZVAL_DOUBLE(args[1], g_value_get_float(value));
+			break; 
+			
 		case G_TYPE_DOUBLE:
 			ZVAL_DOUBLE(args[1], g_value_get_double(value));
 			break; 
+			
 		case G_TYPE_STRING: 
 			ZVAL_STRING(args[1], (char *)g_value_get_string(value), 1);
 			break; 
+			
 		default: 
 			ZVAL_NULL(args[1]);
 			break; 
@@ -516,9 +549,41 @@ static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const c
 }
 /* }}} */
 
-/* {{{ _php_gupnp_device_action_cb
+/* {{{ _php_gupnp_subscription_lost_cb
  */
-static void _php_gupnp_device_action_cb(GUPnPService *gupnp_service, GUPnPServiceAction *gupnp_action, gpointer userdata) {
+static void _php_gupnp_subscription_lost_cb(GUPnPServiceProxy *proxy, const GError *error, gpointer userdata)
+{
+	zval *args[2];
+	php_gupnp_service_proxy_t *sproxy = (php_gupnp_service_proxy_t *)userdata;
+	php_gupnp_callback_t *callback;
+	zval retval;
+	
+	TSRMLS_FETCH_FROM_CTX(sproxy ? sproxy->thread_ctx : NULL);
+
+	if (!sproxy || !sproxy->callback_signal || !error) {
+		return;
+	}
+	
+	MAKE_STD_ZVAL(args[0]);
+	ZVAL_STRING(args[0], (char *)error->message, 1); 
+	
+	callback = sproxy->callback_signal;
+	args[2] = callback->arg;
+	args[2]->refcount++;
+	
+	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 3, args TSRMLS_CC) == SUCCESS) {
+		zval_dtor(&retval);
+	}
+	zval_ptr_dtor(&(args[0]));
+	zval_ptr_dtor(&(args[1]));
+	
+	return;
+}
+/* }}} */
+
+/* {{{ _php_gupnp_service_action_invoked_cb
+ */
+static void _php_gupnp_service_action_invoked_cb(GUPnPService *gupnp_service, GUPnPServiceAction *gupnp_action, gpointer userdata) {
 	zval *args[3];
 	php_gupnp_callback_t *callback;
 	php_gupnp_service_t *service;
@@ -531,6 +596,7 @@ static void _php_gupnp_device_action_cb(GUPnPService *gupnp_service, GUPnPServic
 		return;
 	}
 	
+	/* TODO: it seems that it's not right decision... */
 	MAKE_STD_ZVAL(args[0]);
 	service = emalloc(sizeof(php_gupnp_service_t));
 	service->service = gupnp_service;
@@ -556,6 +622,47 @@ static void _php_gupnp_device_action_cb(GUPnPService *gupnp_service, GUPnPServic
 }
 /* }}} */
 
+/* {{{ _php_gupnp_service_notify_failed_cb
+ */
+static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, const GList *callback_urls, const GError *reason, gpointer userdata) {
+	zval *args[3];
+	php_gupnp_callback_t *callback;
+	php_gupnp_service_t *service;
+	php_gupnp_service_action_t *service_action = (php_gupnp_service_action_t *)userdata;
+	zval retval;
+	
+	TSRMLS_FETCH_FROM_CTX(service_action ? service_action->thread_ctx : NULL);
+	
+	if (!service_action || !service_action->callback) {
+		return;
+	}
+	
+	/* TODO: it seems that it's not right decision... */
+	MAKE_STD_ZVAL(args[0]);
+	service = emalloc(sizeof(php_gupnp_service_t));
+	service->service = gupnp_service;
+	service->rsrc_id = zend_list_insert(service, le_service);
+	ZVAL_RESOURCE(args[0], service->rsrc_id);
+	zend_list_addref(service->rsrc_id);
+	
+	MAKE_STD_ZVAL(args[1]);
+	ZVAL_STRING(args[1], (char *)reason->message, 1); 
+	
+	callback = service_action->callback;
+	args[2] = callback->arg;
+	args[2]->refcount++;
+	
+	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 3, args TSRMLS_CC) == SUCCESS) {
+		zval_dtor(&retval);
+	}
+	zval_ptr_dtor(&(args[0]));
+	zval_ptr_dtor(&(args[1]));
+	zval_ptr_dtor(&(args[2]));
+}
+/* }}} */
+
+
+
 /* {{{ PHP_MINIT_FUNCTION
  */
 PHP_MINIT_FUNCTION(gupnp)
@@ -565,8 +672,10 @@ PHP_MINIT_FUNCTION(gupnp)
 	*/
 	
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_BOOLEAN", G_TYPE_BOOLEAN,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_TYPE_INT", G_TYPE_INT,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_LONG", G_TYPE_LONG,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_DOUBLE", G_TYPE_DOUBLE,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_TYPE_FLOAT",  G_TYPE_FLOAT,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_STRING", G_TYPE_STRING,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE", GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_DEVICE_PROXY_UNAVAILABLE", GUPNP_SIGNAL_DEVICE_PROXY_UNAVAILABLE,  CONST_CS | CONST_PERSISTENT);
@@ -574,7 +683,7 @@ PHP_MINIT_FUNCTION(gupnp)
 	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_SERVICE_PROXY_UNAVAILABLE", GUPNP_SIGNAL_SERVICE_PROXY_UNAVAILABLE,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_ACTION_INVOKED", GUPNP_SIGNAL_ACTION_INVOKED,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_NOTIFY_FAILED", GUPNP_SIGNAL_NOTIFY_FAILED,  CONST_CS | CONST_PERSISTENT);
-	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_QUERY_VARIABLE", GUPNP_SIGNAL_QUERY_VARIABLE,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_SUBSCRIPTION_LOST", GUPNP_SIGNAL_SUBSCRIPTION_LOST,  CONST_CS | CONST_PERSISTENT);
 	
 	le_context = zend_register_list_destructors_ex(_php_gupnp_context_dtor, NULL, "context", module_number);
 	le_cpoint = zend_register_list_destructors_ex(_php_gupnp_cpoint_dtor, NULL, "control point", module_number);
@@ -583,6 +692,7 @@ PHP_MINIT_FUNCTION(gupnp)
 	le_service_proxy = zend_register_list_destructors_ex(_php_gupnp_service_proxy_dtor, NULL, "service proxy", module_number);
 	le_device_proxy = zend_register_list_destructors_ex(_php_gupnp_device_proxy_dtor, NULL, "device proxy", module_number);
 	le_service_info = zend_register_list_destructors_ex(_php_gupnp_service_info_dtor, NULL, "service info", module_number);
+	le_service_introspection = zend_register_list_destructors_ex(_php_gupnp_service_introspection_dtor, NULL, "service introspection", module_number);
 	le_service_action = zend_register_list_destructors_ex(_php_gupnp_service_action_dtor, NULL, "service action", module_number);
 	
 	/* Required initialisation */
@@ -1048,10 +1158,6 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 			signal_name = "notify-failed::";
 			break;
 			
-		case GUPNP_SIGNAL_QUERY_VARIABLE:
-			signal_name = "query-variable::";
-			break;
-			
 		default:
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Not valid signal");
 			RETURN_FALSE;
@@ -1087,9 +1193,17 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 	action_name_full = emalloc(strlen(signal_name) + action_name_len);
 	strcpy(action_name_full, signal_name);
 	strcat(action_name_full, action_name);
-
-	g_signal_connect(service->service_info, action_name_full, G_CALLBACK(_php_gupnp_device_action_cb), service_action);
 	
+	
+	switch (signal) {
+		case GUPNP_SIGNAL_ACTION_INVOKED:
+			g_signal_connect(service->service_info, action_name_full, G_CALLBACK(_php_gupnp_service_action_invoked_cb), service_action);
+			break;
+			
+		case GUPNP_SIGNAL_NOTIFY_FAILED:
+			g_signal_connect(service->service_info, action_name_full, G_CALLBACK(_php_gupnp_service_notify_failed_cb), service_action);
+			break;
+	}
 	RETURN_TRUE;
 }
 /* }}} */
@@ -1155,7 +1269,6 @@ PHP_FUNCTION(gupnp_control_point_callback_set)
 		ALLOC_INIT_ZVAL(zarg);
 	}
 	
-	//if ((signal < 0) || (signal > 3)) {
 	if (signal != GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE
 		&& signal != GUPNP_SIGNAL_DEVICE_PROXY_UNAVAILABLE
 		&& signal != GUPNP_SIGNAL_SERVICE_PROXY_AVAILABLE
@@ -1241,7 +1354,7 @@ PHP_FUNCTION(gupnp_service_info_get)
 	php_gupnp_service_proxy_t *sproxy;
 	char *info_data[2][8];
 	int i;
-	SoupURI* url_base;
+	SoupURI *url_base;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zproxy) == FAILURE) {
 		return;
@@ -1281,6 +1394,159 @@ PHP_FUNCTION(gupnp_service_info_get)
 }
 /* }}} */
 
+/* {{{ proto resource gupnp_service_info_get_introspection(resource proxy)
+   Get resource introspection of service. */
+PHP_FUNCTION(gupnp_service_info_get_introspection)
+{
+	zval *zproxy;
+	php_gupnp_service_proxy_t *sproxy;
+	GUPnPServiceIntrospection *introspection;
+	php_gupnp_service_introspection_t *sintrospection;
+	GError *error;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zproxy) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
+	
+	introspection = gupnp_service_info_get_introspection(GUPNP_SERVICE_INFO(sproxy->proxy), &error);
+	
+	if (!introspection) {
+		RETURN_FALSE;
+	}
+	
+	sintrospection = emalloc(sizeof(php_gupnp_service_introspection_t));
+	sintrospection->introspection = introspection;
+	sintrospection->rsrc_id = zend_list_insert(sintrospection, le_service_introspection);
+	
+	RETURN_RESOURCE(sintrospection->rsrc_id);
+	
+}
+/* }}} */
+
+/* {{{ _php_gupnp_get_value_type_name
+ */
+char *_php_gupnp_get_value_type_name(GType g_type) 
+{
+	switch (g_type) {
+		case G_TYPE_BOOLEAN:
+			return "GUPNP_TYPE_BOOLEAN";
+		case G_TYPE_INT:
+			return "GUPNP_TYPE_INT";
+		case G_TYPE_LONG:
+			return "GUPNP_TYPE_LONG";
+		case G_TYPE_FLOAT:
+			return "GUPNP_TYPE_FLOAT";
+		case G_TYPE_DOUBLE:
+			return "GUPNP_TYPE_DOBLE";
+		case G_TYPE_STRING:
+			return "GUPNP_TYPE_STRING";
+		default:
+			return "unknown";
+	}
+}
+/* }}} */
+
+/* {{{ _php_gupnp_set_zval_by_gvalue
+ */
+zval *_php_gupnp_set_zval_by_gvalue(const GValue *g_value) 
+{
+	zval *z_value;
+	
+	switch (G_VALUE_TYPE(g_value)) {
+		case G_TYPE_BOOLEAN: 
+			ZVAL_BOOL(z_value, g_value_get_boolean(g_value));
+			break; 
+			
+		case G_TYPE_INT:
+			ZVAL_LONG(z_value, g_value_get_int(g_value));
+			break; 
+			
+		case G_TYPE_LONG:
+			ZVAL_LONG(z_value, g_value_get_long(g_value));
+			break; 
+			
+		case G_TYPE_FLOAT:
+			ZVAL_DOUBLE(z_value, g_value_get_float(g_value));
+			break; 
+			
+		case G_TYPE_DOUBLE:
+			ZVAL_DOUBLE(z_value, g_value_get_double(g_value));
+			break; 
+			
+		case G_TYPE_STRING: 
+			ZVAL_STRING(z_value, (char *)g_value_get_string(g_value), 1);
+			break; 
+			
+		default: 
+			ZVAL_NULL(z_value);
+			break; 
+	}
+	return z_value;
+}
+/* }}} */
+
+/* {{{ proto array gupnp_service_introspection_get_state_variable(resource introspection)
+   Returns the state variable data by the name variable_name in this service. */
+PHP_FUNCTION(gupnp_service_introspection_get_state_variable)
+{
+	zval *zintrospection, *z_default_value, *z_minimum, *z_maximum, *z_step;
+	php_gupnp_service_introspection_t *sintrospection;
+	char *variable_name;
+	long variable_name_len;
+	const GUPnPServiceStateVariableInfo *variable;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &zintrospection, &variable_name, &variable_name_len) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_SERVICE_INTROSPECTION(zintrospection, sintrospection);
+	
+	variable = gupnp_service_introspection_get_state_variable(sintrospection->introspection, variable_name);
+	
+	if (!variable) {
+		RETURN_FALSE;
+	}
+	
+	array_init(return_value);
+	add_assoc_string(return_value, "name", variable->name, 1);
+	add_assoc_bool(return_value, "send_events", variable->send_events);
+	add_assoc_bool(return_value, "is_numeric", variable->is_numeric);
+	add_assoc_string(return_value, "type", _php_gupnp_get_value_type_name(variable->type), 1);
+	
+	switch (variable->type) {
+		case G_TYPE_BOOLEAN:
+			z_default_value = _php_gupnp_set_zval_by_gvalue(&variable->default_value);
+			add_assoc_bool(return_value, "default_value", Z_BVAL_P(z_default_value));
+			break;
+			
+		case G_TYPE_LONG:
+		case G_TYPE_INT:
+			z_default_value = _php_gupnp_set_zval_by_gvalue(&variable->default_value);
+			z_minimum = _php_gupnp_set_zval_by_gvalue(&variable->minimum);
+			z_maximum = _php_gupnp_set_zval_by_gvalue(&variable->maximum);
+			z_step = _php_gupnp_set_zval_by_gvalue(&variable->step);
+			add_assoc_long(return_value, "default_value", Z_LVAL_P(z_default_value));
+			add_assoc_long(return_value, "minimum", Z_LVAL_P(z_minimum));
+			add_assoc_long(return_value, "maximum", Z_LVAL_P(z_maximum));
+			add_assoc_long(return_value, "step", Z_LVAL_P(z_step));
+			break;
+		/*	
+		case G_TYPE_DOUBLE:
+			return "GUPNP_TYPE_DOUBLE";
+		case G_TYPE_STRING:
+			return "GUPNP_TYPE_STRING";
+		default:
+			return NULL;
+		*/
+		
+	}
+	
+}
+/* }}} */
+
+
 /* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
    Sends action with parameters to the service exposed by proxy synchronously and set value. */
 PHP_FUNCTION(gupnp_service_proxy_action_set)
@@ -1312,6 +1578,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_set)
 			}
 			break; 
 		
+		case G_TYPE_INT:
 		case G_TYPE_LONG:
 			if (Z_TYPE_P(param_val) == IS_LONG) {
 				result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
@@ -1322,6 +1589,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_set)
 			}
 			break; 
 		
+		case G_TYPE_FLOAT: 
 		case G_TYPE_DOUBLE: 
 			if (Z_TYPE_P(param_val) == IS_DOUBLE) {
 				result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
@@ -1389,7 +1657,8 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 				RETURN_BOOL(value_gboolean);
 			}
 		}
-
+		
+		case G_TYPE_INT:
 		case G_TYPE_LONG:
 		{
 			glong value_glong = 0;
@@ -1400,6 +1669,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 			}
 		}
 		
+		case G_TYPE_FLOAT:
 		case G_TYPE_DOUBLE: 
 		{
 			gdouble value_gdouble = 0;
@@ -1547,6 +1817,59 @@ PHP_FUNCTION(gupnp_service_proxy_remove_notify)
 }
 /* }}} */
 
+/* {{{ proto bool gupnp_browse_service(resource cpoint, int signal, mixed callback[, mixed arg])
+   Set control point callback function for signal. */
+PHP_FUNCTION(gupnp_service_proxy_callback_set)
+{
+	zval *zproxy, *zcallback, *zarg = NULL;
+	char *func_name;
+	int signal;
+	php_gupnp_callback_t *callback, *old_callback = NULL;
+	php_gupnp_service_proxy_t *sproxy;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rlz|z", &zproxy, &signal, &zcallback, &zarg) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
+	
+	if (!zend_is_callable(zcallback, 0, &func_name)) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
+		efree(func_name);
+		RETURN_FALSE;
+	}
+	efree(func_name);
+	
+	zval_add_ref(&zcallback);
+	if (zarg) {
+		zval_add_ref(&zarg);
+	} else {
+		ALLOC_INIT_ZVAL(zarg);
+	}
+	
+	if (signal != GUPNP_SIGNAL_SUBSCRIPTION_LOST) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%d' is not a valid signal", signal);
+		RETURN_FALSE;
+	}
+	
+	callback = emalloc(sizeof(php_gupnp_callback_t));
+	callback->func = zcallback;
+	callback->arg = zarg;
+	
+	old_callback = sproxy->callback_signal;
+	sproxy->callback_signal = callback;
+	
+	g_signal_connect(sproxy->proxy, "subscription-lost", 
+		G_CALLBACK(_php_gupnp_subscription_lost_cb), sproxy);
+	
+	if (old_callback) {
+		_php_gupnp_callback_free(old_callback);
+	}
+
+	RETURN_TRUE;
+}
+/* }}} */
+
 /* {{{ proto bool gupnp_service_action_set(resource action, string name, int type, mixed value)
    Sets the specified action return values. */
 PHP_FUNCTION(gupnp_service_action_set)
@@ -1575,6 +1898,7 @@ PHP_FUNCTION(gupnp_service_action_set)
 			}
 			break; 
 		
+		case G_TYPE_INT:
 		case G_TYPE_LONG:
 			if (Z_TYPE_P(param_val) == IS_LONG) {
 				gupnp_service_action_set(service_action->action, param_name, param_type, Z_LVAL_P(param_val), NULL);
@@ -1585,6 +1909,7 @@ PHP_FUNCTION(gupnp_service_action_set)
 			}
 			break; 
 		
+		case G_TYPE_FLOAT: 
 		case G_TYPE_DOUBLE: 
 			if (Z_TYPE_P(param_val) == IS_DOUBLE) {
 				gupnp_service_action_set(service_action->action, param_name, param_type, Z_DVAL_P(param_val), NULL);
@@ -1636,12 +1961,14 @@ PHP_FUNCTION(gupnp_service_action_get)
 			g_value_init(&g_value, G_TYPE_BOOLEAN);
 			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
 			RETURN_BOOL(g_value_get_boolean(&g_value));
-
+		
+		case G_TYPE_INT:
 		case G_TYPE_LONG:
 			g_value_init(&g_value, G_TYPE_LONG);
 			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
 			RETURN_LONG(g_value_get_long(&g_value));
 		
+		case G_TYPE_FLOAT:
 		case G_TYPE_DOUBLE: 
 			g_value_init(&g_value, G_TYPE_DOUBLE);
 			gupnp_service_action_get_value(service_action->action, param_name, &g_value);
@@ -1687,6 +2014,7 @@ PHP_FUNCTION(gupnp_service_notify)
 			}
 			break; 
 		
+		case G_TYPE_INT:
 		case G_TYPE_LONG:
 			if (Z_TYPE_P(param_val) == IS_LONG) {
 				gupnp_service_notify(service->service, param_name, param_type, Z_LVAL_P(param_val), NULL);
@@ -1697,6 +2025,7 @@ PHP_FUNCTION(gupnp_service_notify)
 			}
 			break; 
 		
+		case G_TYPE_FLOAT:
 		case G_TYPE_DOUBLE: 
 			if (Z_TYPE_P(param_val) == IS_DOUBLE) {
 				gupnp_service_notify(service->service, param_name, param_type, Z_DVAL_P(param_val), NULL);

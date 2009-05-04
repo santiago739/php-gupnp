@@ -58,19 +58,20 @@ PHP_FUNCTION(gupnp_root_device_get_relative_location);
 PHP_FUNCTION(gupnp_device_info_get);
 PHP_FUNCTION(gupnp_device_info_get_service);
 PHP_FUNCTION(gupnp_device_action_callback_set);
-PHP_FUNCTION(gupnp_main_loop_run);
-PHP_FUNCTION(gupnp_main_loop_stop);
 PHP_FUNCTION(gupnp_control_point_new);
 PHP_FUNCTION(gupnp_control_point_callback_set);
 PHP_FUNCTION(gupnp_control_point_browse_start);
 PHP_FUNCTION(gupnp_control_point_browse_stop);
 PHP_FUNCTION(gupnp_service_info_get);
+PHP_FUNCTION(gupnp_service_info_get_introspection);
+PHP_FUNCTION(gupnp_service_introspection_get_state_variable);
 PHP_FUNCTION(gupnp_service_proxy_action_set);
 PHP_FUNCTION(gupnp_service_proxy_action_get);
 PHP_FUNCTION(gupnp_service_proxy_set_subscribed);
 PHP_FUNCTION(gupnp_service_proxy_get_subscribed);
 PHP_FUNCTION(gupnp_service_proxy_add_notify);
 PHP_FUNCTION(gupnp_service_proxy_remove_notify);
+PHP_FUNCTION(gupnp_service_proxy_callback_set);
 PHP_FUNCTION(gupnp_service_action_set);
 PHP_FUNCTION(gupnp_service_action_get);
 PHP_FUNCTION(gupnp_service_notify);
@@ -91,17 +92,8 @@ ZEND_END_MODULE_GLOBALS(gupnp)
 #define GUPNP_SIGNAL_SERVICE_PROXY_UNAVAILABLE 3
 #define GUPNP_SIGNAL_ACTION_INVOKED 4
 #define GUPNP_SIGNAL_NOTIFY_FAILED 5
-#define GUPNP_SIGNAL_QUERY_VARIABLE 6
+#define GUPNP_SIGNAL_SUBSCRIPTION_LOST 6
 
-/* In every utility function you add that needs to use variables 
-   in php_gupnp_globals, call TSRMLS_FETCH(); after declaring other 
-   variables used by that function, or better yet, pass in TSRMLS_CC
-   after the last function argument and declare your utility function
-   with TSRMLS_DC after the last declared argument.  Always refer to
-   the globals in your function as GUPNP_G(variable).  You are 
-   encouraged to rename these macros something shorter, see
-   examples in any other php module directory.
-*/
 
 #ifdef ZTS
 #define GUPNP_G(v) TSRMG(gupnp_globals_id, zend_gupnp_globals *, v)
