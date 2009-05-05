@@ -38,6 +38,10 @@ typedef struct _php_gupnp_callback_t { /* {{{ */
 typedef struct _php_gupnp_context_t { /* {{{ */
 	GUPnPContext *context;
 	int rsrc_id;
+	php_gupnp_callback_t *callback_timeout;
+#ifdef ZTS
+	void ***thread_ctx;
+#endif
 } php_gupnp_context_t;
 /* }}} */
 
@@ -158,6 +162,7 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_context_get_subscription_timeout,	NULL)
 	PHP_FE(gupnp_context_host_path,	NULL)
 	PHP_FE(gupnp_context_unhost_path,	NULL)
+	PHP_FE(gupnp_context_timeout_add,	NULL)
 	PHP_FE(gupnp_root_device_new,	NULL)
 	PHP_FE(gupnp_root_device_start,	NULL)
 	PHP_FE(gupnp_root_device_stop,	NULL)
@@ -223,25 +228,6 @@ PHP_INI_BEGIN()
     STD_PHP_INI_ENTRY("gupnp.global_string", "foobar", PHP_INI_ALL, OnUpdateString, global_string, zend_gupnp_globals, gupnp_globals)
 PHP_INI_END()
 */
-/* }}} */
-
-/* {{{ _php_gupnp_globals_ctor
- */
-static void _php_gupnp_globals_ctor(zend_gupnp_globals *gupnp_globals TSRMLS_DC)
-{
-	gupnp_globals->main_loop = NULL;
-}
-/* }}} */
-
-/* {{{ _php_gupnp_globals_ctor
- */
-static void _php_gupnp_globals_dtor(zend_gupnp_globals *gupnp_globals TSRMLS_DC)
-{
-	/* Clean up */
-	if (gupnp_globals->main_loop) {
-		g_main_loop_unref(gupnp_globals->main_loop);
-	}
-}
 /* }}} */
 
 /* {{{ _php_gupnp_callback_free
@@ -328,6 +314,7 @@ static void _php_gupnp_context_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{
 	php_gupnp_context_t *context = (php_gupnp_context_t *)rsrc->ptr;
 	
 	g_object_unref(context->context);
+	_php_gupnp_callback_free(context->callback_timeout);
 	efree(context);
 }
 /* }}} */
@@ -363,6 +350,32 @@ static void _php_gupnp_service_action_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 	
 	_php_gupnp_callback_free(service_action->callback);
 	efree(service_action);
+}
+/* }}} */
+
+/* {{{ _php_gupnp_context_timeout_cb
+ */
+static gboolean _php_gupnp_context_timeout_cb(gpointer userdata)
+{
+	zval *args[1];
+	php_gupnp_context_t *context = (php_gupnp_context_t *)userdata;
+	php_gupnp_callback_t *callback;
+	zval retval;
+	TSRMLS_FETCH_FROM_CTX(context ? context->thread_ctx : NULL);
+	if (!context || !context->callback_timeout) {
+		return FALSE;
+	}
+	
+	callback = context->callback_timeout;
+	args[0] = callback->arg;
+	args[0]->refcount++;
+	
+	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 1, args TSRMLS_CC) == SUCCESS) {
+		zval_dtor(&retval);
+	}
+	zval_ptr_dtor(&(args[0]));
+
+	return TRUE;
 }
 /* }}} */
 
@@ -661,6 +674,68 @@ static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, con
 }
 /* }}} */
 
+/* {{{ _php_gupnp_get_value_type_name
+ */
+char *_php_gupnp_get_value_type_name(GType g_type) 
+{
+	switch (g_type) {
+		case G_TYPE_BOOLEAN:
+			return "GUPNP_TYPE_BOOLEAN";
+		case G_TYPE_INT:
+			return "GUPNP_TYPE_INT";
+		case G_TYPE_LONG:
+			return "GUPNP_TYPE_LONG";
+		case G_TYPE_FLOAT:
+			return "GUPNP_TYPE_FLOAT";
+		case G_TYPE_DOUBLE:
+			return "GUPNP_TYPE_DOBLE";
+		case G_TYPE_STRING:
+			return "GUPNP_TYPE_STRING";
+		default:
+			return "unknown";
+	}
+}
+/* }}} */
+
+/* {{{ _php_gupnp_get_zval_by_gvalue
+ */
+zval *_php_gupnp_get_zval_by_gvalue(const GValue *g_value) 
+{
+	zval *z_value;
+	
+	MAKE_STD_ZVAL(z_value);
+	switch (G_VALUE_TYPE(g_value)) {
+		case G_TYPE_BOOLEAN: 
+			ZVAL_BOOL(z_value, g_value_get_boolean(g_value));
+			break; 
+			
+		case G_TYPE_INT:
+			ZVAL_LONG(z_value, g_value_get_int(g_value));
+			break; 
+			
+		case G_TYPE_LONG:
+			ZVAL_LONG(z_value, g_value_get_long(g_value));
+			break; 
+			
+		case G_TYPE_FLOAT:
+			ZVAL_DOUBLE(z_value, g_value_get_float(g_value));
+			break; 
+			
+		case G_TYPE_DOUBLE:
+			ZVAL_DOUBLE(z_value, g_value_get_double(g_value));
+			break; 
+			
+		case G_TYPE_STRING: 
+			ZVAL_STRING(z_value, (char *)g_value_get_string(g_value), 1);
+			break; 
+			
+		default: 
+			ZVAL_NULL(z_value);
+			break; 
+	}
+	return z_value;
+}
+/* }}} */
 
 
 /* {{{ PHP_MINIT_FUNCTION
@@ -699,15 +774,6 @@ PHP_MINIT_FUNCTION(gupnp)
 	g_thread_init(NULL);
 	g_type_init();
 	
-#ifdef ZTS     
-	ts_allocate_id(&gupnp_globals_id, 
-		sizeof(zend_gupnp_globals), 
-		(ts_allocate_ctor)_php_gupnp_globals_ctor, 
-		(ts_allocate_dtor)_php_gupnp_globals_dtor); 
-#else 
-		_php_gupnp_globals_ctor(&gupnp_globals TSRMLS_CC); 
-#endif 
-	
 	return SUCCESS;
 }
 /* }}} */
@@ -719,22 +785,6 @@ PHP_MSHUTDOWN_FUNCTION(gupnp)
 	/* uncomment this line if you have INI entries
 	UNREGISTER_INI_ENTRIES();
 	*/
-
-#ifndef ZTS
-	_php_gupnp_globals_dtor(&gupnp_globals TSRMLS_CC); 
-#endif 	
-	
-	/* Clean up */
-	/*
-	if (GUPNP_G(main_loop)) {
-		g_main_loop_unref(GUPNP_G(main_loop));
-		
-	}
-	*/
-	/*if (GUPNP_G(context)) {
-		g_object_unref(GUPNP_G(context));
-	}*/
-	
 	
 	return SUCCESS;
 }
@@ -745,8 +795,6 @@ PHP_MSHUTDOWN_FUNCTION(gupnp)
  */
 PHP_RINIT_FUNCTION(gupnp)
 {
-	//GUPNP_G(main_loop) = g_main_loop_new(NULL, FALSE);
-	
 	return SUCCESS;
 }
 /* }}} */
@@ -756,10 +804,6 @@ PHP_RINIT_FUNCTION(gupnp)
  */
 PHP_RSHUTDOWN_FUNCTION(gupnp)
 {
-	/*if (GUPNP_G(main_loop)) {
-		g_main_loop_unref(GUPNP_G(main_loop));
-	}*/
-	
 	return SUCCESS;
 }
 /* }}} */
@@ -794,6 +838,8 @@ PHP_FUNCTION(gupnp_context_new)
 	
 	context = emalloc(sizeof(php_gupnp_context_t));
 	context->context = gupnp_context_new(NULL, host_ip, port, &error);
+	context->callback_timeout = NULL;
+	TSRMLS_SET_CTX(context->thread_ctx);
 	
 	if (context->context == NULL) {
 		if (error != NULL) {
@@ -914,6 +960,52 @@ PHP_FUNCTION(gupnp_context_unhost_path)
 	
 	ZVAL_TO_CONTEXT(zcontext, context);
 	gupnp_context_unhost_path(context->context, server_path);
+	
+	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto bool gupnp_timeout_add(int timeout, mixed callback[, mixed arg]) 
+   Sets a function to be called at regular intervals.  */
+PHP_FUNCTION(gupnp_context_timeout_add)
+{
+	zval *zcontext, *zcallback, *zarg = NULL;
+	char *func_name;
+	int timeout;
+	php_gupnp_callback_t *callback, *old_callback;
+	php_gupnp_context_t *context;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rlz|z", &zcontext, &timeout, &zcallback, &zarg) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_CONTEXT(zcontext, context);
+	
+	if (!zend_is_callable(zcallback, 0, &func_name)) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
+		efree(func_name);
+		RETURN_FALSE;
+	}
+	efree(func_name);
+	
+	zval_add_ref(&zcallback);
+	if (zarg) {
+		zval_add_ref(&zarg);
+	} else {
+		ALLOC_INIT_ZVAL(zarg);
+	}
+	
+	callback = emalloc(sizeof(php_gupnp_callback_t));
+	callback->func = zcallback;
+	callback->arg = zarg;
+	
+	old_callback = context->callback_timeout;
+	context->callback_timeout = callback;
+	if (old_callback) {
+		_php_gupnp_callback_free(old_callback);
+	}
+
+	g_timeout_add (timeout, _php_gupnp_context_timeout_cb, context);
 	
 	RETURN_TRUE;
 }
@@ -1425,69 +1517,7 @@ PHP_FUNCTION(gupnp_service_info_get_introspection)
 }
 /* }}} */
 
-/* {{{ _php_gupnp_get_value_type_name
- */
-char *_php_gupnp_get_value_type_name(GType g_type) 
-{
-	switch (g_type) {
-		case G_TYPE_BOOLEAN:
-			return "GUPNP_TYPE_BOOLEAN";
-		case G_TYPE_INT:
-			return "GUPNP_TYPE_INT";
-		case G_TYPE_LONG:
-			return "GUPNP_TYPE_LONG";
-		case G_TYPE_FLOAT:
-			return "GUPNP_TYPE_FLOAT";
-		case G_TYPE_DOUBLE:
-			return "GUPNP_TYPE_DOBLE";
-		case G_TYPE_STRING:
-			return "GUPNP_TYPE_STRING";
-		default:
-			return "unknown";
-	}
-}
-/* }}} */
-
-/* {{{ _php_gupnp_set_zval_by_gvalue
- */
-zval *_php_gupnp_set_zval_by_gvalue(const GValue *g_value) 
-{
-	zval *z_value;
-	
-	switch (G_VALUE_TYPE(g_value)) {
-		case G_TYPE_BOOLEAN: 
-			ZVAL_BOOL(z_value, g_value_get_boolean(g_value));
-			break; 
-			
-		case G_TYPE_INT:
-			ZVAL_LONG(z_value, g_value_get_int(g_value));
-			break; 
-			
-		case G_TYPE_LONG:
-			ZVAL_LONG(z_value, g_value_get_long(g_value));
-			break; 
-			
-		case G_TYPE_FLOAT:
-			ZVAL_DOUBLE(z_value, g_value_get_float(g_value));
-			break; 
-			
-		case G_TYPE_DOUBLE:
-			ZVAL_DOUBLE(z_value, g_value_get_double(g_value));
-			break; 
-			
-		case G_TYPE_STRING: 
-			ZVAL_STRING(z_value, (char *)g_value_get_string(g_value), 1);
-			break; 
-			
-		default: 
-			ZVAL_NULL(z_value);
-			break; 
-	}
-	return z_value;
-}
-/* }}} */
-
-/* {{{ proto array gupnp_service_introspection_get_state_variable(resource introspection)
+/* {{{ proto array gupnp_service_introspection_get_state_variable(resource introspection, string variable_name)
    Returns the state variable data by the name variable_name in this service. */
 PHP_FUNCTION(gupnp_service_introspection_get_state_variable)
 {
@@ -1517,30 +1547,38 @@ PHP_FUNCTION(gupnp_service_introspection_get_state_variable)
 	
 	switch (variable->type) {
 		case G_TYPE_BOOLEAN:
-			z_default_value = _php_gupnp_set_zval_by_gvalue(&variable->default_value);
+			z_default_value = _php_gupnp_get_zval_by_gvalue(&(variable->default_value));
 			add_assoc_bool(return_value, "default_value", Z_BVAL_P(z_default_value));
 			break;
 			
-		case G_TYPE_LONG:
 		case G_TYPE_INT:
-			z_default_value = _php_gupnp_set_zval_by_gvalue(&variable->default_value);
-			z_minimum = _php_gupnp_set_zval_by_gvalue(&variable->minimum);
-			z_maximum = _php_gupnp_set_zval_by_gvalue(&variable->maximum);
-			z_step = _php_gupnp_set_zval_by_gvalue(&variable->step);
+		case G_TYPE_LONG:
+			z_default_value = _php_gupnp_get_zval_by_gvalue(&(variable->default_value));
+			z_minimum 		= _php_gupnp_get_zval_by_gvalue(&(variable->minimum));
+			z_maximum 		= _php_gupnp_get_zval_by_gvalue(&(variable->maximum));
+			z_step 			= _php_gupnp_get_zval_by_gvalue(&(variable->step));
 			add_assoc_long(return_value, "default_value", Z_LVAL_P(z_default_value));
 			add_assoc_long(return_value, "minimum", Z_LVAL_P(z_minimum));
 			add_assoc_long(return_value, "maximum", Z_LVAL_P(z_maximum));
 			add_assoc_long(return_value, "step", Z_LVAL_P(z_step));
 			break;
-		/*	
+			
+		case G_TYPE_FLOAT:
 		case G_TYPE_DOUBLE:
-			return "GUPNP_TYPE_DOUBLE";
+			z_default_value = _php_gupnp_get_zval_by_gvalue(&(variable->default_value));
+			z_minimum 		= _php_gupnp_get_zval_by_gvalue(&(variable->minimum));
+			z_maximum 		= _php_gupnp_get_zval_by_gvalue(&(variable->maximum));
+			z_step 			= _php_gupnp_get_zval_by_gvalue(&(variable->step));
+			add_assoc_double(return_value, "default_value", Z_DVAL_P(z_default_value));
+			add_assoc_double(return_value, "minimum", Z_DVAL_P(z_minimum));
+			add_assoc_double(return_value, "maximum", Z_DVAL_P(z_maximum));
+			add_assoc_double(return_value, "step", Z_DVAL_P(z_step));
+			break;
+			
 		case G_TYPE_STRING:
-			return "GUPNP_TYPE_STRING";
-		default:
-			return NULL;
-		*/
-		
+			z_default_value = _php_gupnp_get_zval_by_gvalue(&(variable->default_value));
+			add_assoc_string(return_value, "default_value", Z_STRVAL_P(z_default_value), 1);
+			break;
 	}
 	
 }

@@ -37,6 +37,20 @@ function set_channel_cb($service, $action, $arg)
 	gupnp_service_action_return($action);
 }
 
+function timeout_cb($arg)
+{
+/*
+        gupnp_service_notify (GUPNP_SERVICE (user_data),
+                              "SystemUpdateID",
+                              G_TYPE_UINT,
+                              27182818,
+                              NULL);
+*/
+	printf("Call timeout_cb\n");
+
+	return true;
+}
+
 $GLOBALS['channel'] = 1;
 
 /* Create the UPnP context */
@@ -80,17 +94,20 @@ if (!$service) {
 	exit(-1);
 }
 
-/* Set callback for action PowerOn*/
+/* Set callback for action PowerOn */
 gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "PowerOn", 
 	"power_on_cb", "PowerOn");
 
-/* Set callback for action PowerOff*/
+/* Set callback for action PowerOff */
 gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "PowerOff", 
 	"power_off_cb", "PowerOff");
 
-/* Set callback for action SetChannel*/
+/* Set callback for action SetChannel */
 gupnp_device_action_callback_set($service, GUPNP_SIGNAL_ACTION_INVOKED, "SetChannel", 
 	"set_channel_cb", "SetChannel");
+
+/* Set callback for timeout */
+gupnp_context_timeout_add($context, 5000, "timeout_cb", NULL);
 
 /* Run the main loop */
 gupnp_root_device_start($dev);

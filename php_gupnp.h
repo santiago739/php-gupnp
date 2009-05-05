@@ -49,6 +49,7 @@ PHP_FUNCTION(gupnp_context_set_subscription_timeout);
 PHP_FUNCTION(gupnp_context_get_subscription_timeout);
 PHP_FUNCTION(gupnp_context_host_path);
 PHP_FUNCTION(gupnp_context_unhost_path);
+PHP_FUNCTION(gupnp_context_timeout_add);
 PHP_FUNCTION(gupnp_root_device_new);
 PHP_FUNCTION(gupnp_root_device_start);
 PHP_FUNCTION(gupnp_root_device_stop);
@@ -80,7 +81,6 @@ PHP_FUNCTION(gupnp_service_thaw_notify);
 PHP_FUNCTION(gupnp_service_action_return);
 
 ZEND_BEGIN_MODULE_GLOBALS(gupnp)
-	GMainLoop *main_loop;
 ZEND_END_MODULE_GLOBALS(gupnp)
 
 #define GUPNP_ACTION_SET 0
