@@ -79,6 +79,7 @@ PHP_FUNCTION(gupnp_service_notify);
 PHP_FUNCTION(gupnp_service_freeze_notify);
 PHP_FUNCTION(gupnp_service_thaw_notify);
 PHP_FUNCTION(gupnp_service_action_return);
+PHP_FUNCTION(gupnp_service_action_return_error);
 
 ZEND_BEGIN_MODULE_GLOBALS(gupnp)
 ZEND_END_MODULE_GLOBALS(gupnp)

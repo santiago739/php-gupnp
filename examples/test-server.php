@@ -32,9 +32,12 @@ function set_channel_cb($service, $action, $arg)
 		printf("Call gupnp_service_notify\n");
 		$result = gupnp_service_notify($service, 'Channel', GUPNP_TYPE_INT, $GLOBALS['channel']);
 		printf("\tresult: channel has been changed to %d.\n", $GLOBALS['channel']);
+		gupnp_service_action_return($action);
+	} else {
+		gupnp_service_action_return_error($action, 100, "this channel number is already set");
 	}
 	printf("\n");
-	gupnp_service_action_return($action);
+	
 }
 
 function timeout_cb($arg)

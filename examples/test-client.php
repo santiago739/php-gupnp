@@ -30,6 +30,9 @@ function tvcontrol_service_proxy_available_cb($proxy, $arg)
 	show_state_variable($introspection, 'Power');
 	show_state_variable($introspection, 'Channel');
 	show_state_variable($introspection, 'Volume');
+	
+	/* Set callback for async introspection */
+	gupnp_service_info_get_introspection($proxy, "tvcontrol_introspection_cb", NULL);
 
 	/* Subscibe to service proxy */
 	gupnp_service_proxy_callback_set($proxy, GUPNP_SIGNAL_SUBSCRIPTION_LOST, 
@@ -108,7 +111,7 @@ function tvcontrol_set_channel($proxy, $arg)
 		printf("Set channel to %d.\n", $channel_new);
 	}
 	sleep(11);
-	if (!gupnp_service_proxy_action_set($proxy, 'SetChannel', 'Channel', ++$channel_new, GUPNP_TYPE_INT)) {
+	if (!gupnp_service_proxy_action_set($proxy, 'SetChannel', 'Channel', $channel_new, GUPNP_TYPE_INT)) {
 		printf("Cannot set channel\n");
 	} else {
 		printf("Set channel to %d.\n", $channel_new);
@@ -128,6 +131,15 @@ function tvcontrol_subscription_lost_cb($error, $arg)
 {
 	printf("[CALL] tvcontrol_subscription_lost_cb\n");
 }
+
+function tvcontrol_introspection_cb($introspection, $error, $arg)
+{
+	printf("[CALL] tvcontrol_introspection_cb\n");
+	show_state_variable($introspection, 'Power');
+	show_state_variable($introspection, 'Channel');
+	show_state_variable($introspection, 'Volume');
+}
+
 
 /* Check and parse command line arguments */
 if (count($argv) == 1) {

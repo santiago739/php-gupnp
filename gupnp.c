@@ -99,6 +99,10 @@ typedef struct _php_gupnp_service_info_t { /* {{{ */
 typedef struct _php_gupnp_service_introspection_t { /* {{{ */
 	GUPnPServiceIntrospection *introspection;
 	int rsrc_id;
+	php_gupnp_callback_t *callback;
+#ifdef ZTS
+	void ***thread_ctx;
+#endif
 } php_gupnp_service_introspection_t;
 /* }}} */
 
@@ -192,6 +196,7 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_service_freeze_notify, 	NULL)
 	PHP_FE(gupnp_service_thaw_notify, 	NULL)
 	PHP_FE(gupnp_service_action_return, 	NULL)
+	PHP_FE(gupnp_service_action_return_error, 	NULL)
 	{NULL, NULL, NULL}	/* Must be the last line in gupnp_functions[] */
 };
 /* }}} */
@@ -237,8 +242,11 @@ static inline void _php_gupnp_callback_free(php_gupnp_callback_t *callback) /* {
 	if (!callback) {
 		return;
 	}
-
-	zval_ptr_dtor(&callback->func);
+	
+	if (callback->func) {
+		zval_ptr_dtor(&callback->func);
+	}
+	
 	if (callback->arg) {
 		zval_ptr_dtor(&callback->arg);
 	}
@@ -338,6 +346,7 @@ static void _php_gupnp_service_introspection_dtor(zend_rsrc_list_entry *rsrc TSR
 	php_gupnp_service_introspection_t *sintrospection = (php_gupnp_service_introspection_t *)rsrc->ptr;
 	
 	g_object_unref(sintrospection->introspection);
+	_php_gupnp_callback_free(sintrospection->callback);
 	efree(sintrospection);
 }
 /* }}} */
@@ -573,18 +582,22 @@ static void _php_gupnp_subscription_lost_cb(GUPnPServiceProxy *proxy, const GErr
 	
 	TSRMLS_FETCH_FROM_CTX(sproxy ? sproxy->thread_ctx : NULL);
 
-	if (!sproxy || !sproxy->callback_signal || !error) {
+	if (!sproxy || !sproxy->callback_signal) {
 		return;
 	}
 	
-	MAKE_STD_ZVAL(args[0]);
-	ZVAL_STRING(args[0], (char *)error->message, 1); 
+	if (error && error->message) {
+		MAKE_STD_ZVAL(args[0]);
+		ZVAL_STRING(args[0], (char *)error->message, 1); 
+	} else {
+		ALLOC_INIT_ZVAL(args[0]);
+	}
 	
 	callback = sproxy->callback_signal;
-	args[2] = callback->arg;
-	args[2]->refcount++;
+	args[1] = callback->arg;
+	args[1]->refcount++;
 	
-	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 3, args TSRMLS_CC) == SUCCESS) {
+	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 2, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
 	}
 	zval_ptr_dtor(&(args[0]));
@@ -637,7 +650,7 @@ static void _php_gupnp_service_action_invoked_cb(GUPnPService *gupnp_service, GU
 
 /* {{{ _php_gupnp_service_notify_failed_cb
  */
-static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, const GList *callback_urls, const GError *reason, gpointer userdata) {
+static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, const GList *callback_urls, const GError *error, gpointer userdata) {
 	zval *args[3];
 	php_gupnp_callback_t *callback;
 	php_gupnp_service_t *service;
@@ -658,8 +671,12 @@ static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, con
 	ZVAL_RESOURCE(args[0], service->rsrc_id);
 	zend_list_addref(service->rsrc_id);
 	
-	MAKE_STD_ZVAL(args[1]);
-	ZVAL_STRING(args[1], (char *)reason->message, 1); 
+	if (error && error->message) {
+		MAKE_STD_ZVAL(args[1]);
+		ZVAL_STRING(args[1], (char *)error->message, 1); 
+	} else {
+		ALLOC_INIT_ZVAL(args[1]);
+	}
 	
 	callback = service_action->callback;
 	args[2] = callback->arg;
@@ -671,6 +688,50 @@ static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, con
 	zval_ptr_dtor(&(args[0]));
 	zval_ptr_dtor(&(args[1]));
 	zval_ptr_dtor(&(args[2]));
+}
+/* }}} */
+
+/* {{{ _php_gupnp_service_get_introspection_cb
+ */
+static void _php_gupnp_service_get_introspection_cb(GUPnPServiceInfo *info, GUPnPServiceIntrospection *introspection, const GError *error, gpointer userdata)
+{
+	zval *args[3];
+	php_gupnp_service_introspection_t *sintrospection = (php_gupnp_service_introspection_t *)userdata;
+	php_gupnp_callback_t *callback;
+	zval retval;
+	
+	TSRMLS_FETCH_FROM_CTX(sintrospection ? sintrospection->thread_ctx : NULL);
+
+	if (!sintrospection || !sintrospection->callback) {
+		return;
+	}
+	
+	sintrospection->introspection = introspection;
+	sintrospection->rsrc_id = zend_list_insert(sintrospection, le_service_introspection);
+	
+	MAKE_STD_ZVAL(args[0]);
+	ZVAL_RESOURCE(args[0], sintrospection->rsrc_id);
+	zend_list_addref(sintrospection->rsrc_id);
+	
+	if (error && error->message) {
+		MAKE_STD_ZVAL(args[1]);
+		ZVAL_STRING(args[1], (char *)error->message, 1); 
+	} else {
+		ALLOC_INIT_ZVAL(args[1]);
+	}
+	
+	callback = sintrospection->callback;
+	args[2] = callback->arg;
+	args[2]->refcount++;
+	
+	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 3, args TSRMLS_CC) == SUCCESS) {
+		zval_dtor(&retval);
+	}
+	zval_ptr_dtor(&(args[0]));
+	zval_ptr_dtor(&(args[1]));
+	zval_ptr_dtor(&(args[2]));
+	
+	return;
 }
 /* }}} */
 
@@ -759,6 +820,10 @@ PHP_MINIT_FUNCTION(gupnp)
 	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_ACTION_INVOKED", GUPNP_SIGNAL_ACTION_INVOKED,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_NOTIFY_FAILED", GUPNP_SIGNAL_NOTIFY_FAILED,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_SIGNAL_SUBSCRIPTION_LOST", GUPNP_SIGNAL_SUBSCRIPTION_LOST,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_CONTROL_ERROR_INVALID_ACTION", GUPNP_CONTROL_ERROR_INVALID_ACTION,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_CONTROL_ERROR_INVALID_ARGS", GUPNP_CONTROL_ERROR_INVALID_ARGS,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_CONTROL_ERROR_OUT_OF_SYNC", GUPNP_CONTROL_ERROR_OUT_OF_SYNC,  CONST_CS | CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("GUPNP_CONTROL_ERROR_ACTION_FAILED", GUPNP_CONTROL_ERROR_ACTION_FAILED,  CONST_CS | CONST_PERSISTENT);
 	
 	le_context = zend_register_list_destructors_ex(_php_gupnp_context_dtor, NULL, "context", module_number);
 	le_cpoint = zend_register_list_destructors_ex(_php_gupnp_cpoint_dtor, NULL, "control point", module_number);
@@ -1439,7 +1504,7 @@ PHP_FUNCTION(gupnp_control_point_browse_stop)
 /* }}} */
 
 /* {{{ proto array gupnp_service_info_get(resource proxy)
-   Get info of service. */
+   Get full info of service. */
 PHP_FUNCTION(gupnp_service_info_get)
 {
 	zval *zproxy;
@@ -1486,34 +1551,67 @@ PHP_FUNCTION(gupnp_service_info_get)
 }
 /* }}} */
 
-/* {{{ proto resource gupnp_service_info_get_introspection(resource proxy)
-   Get resource introspection of service. */
+/* {{{ proto mixed gupnp_service_info_get_introspection(resource proxy[, mixed callback[, mixed arg]])
+   Get resource introspection of service or register callback if corresponding parameter was passed. */
 PHP_FUNCTION(gupnp_service_info_get_introspection)
 {
-	zval *zproxy;
+	zval *zproxy, *zcallback = NULL, *zarg = NULL;
+	char *func_name;
+	php_gupnp_callback_t *callback;
 	php_gupnp_service_proxy_t *sproxy;
 	GUPnPServiceIntrospection *introspection;
 	php_gupnp_service_introspection_t *sintrospection;
-	GError *error;
+	GError *error = NULL;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zproxy) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r|zz", &zproxy, &zcallback, &zarg) == FAILURE) {
 		return;
 	}
 	
 	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
 	
-	introspection = gupnp_service_info_get_introspection(GUPNP_SERVICE_INFO(sproxy->proxy), &error);
-	
-	if (!introspection) {
-		RETURN_FALSE;
-	}
-	
 	sintrospection = emalloc(sizeof(php_gupnp_service_introspection_t));
-	sintrospection->introspection = introspection;
-	sintrospection->rsrc_id = zend_list_insert(sintrospection, le_service_introspection);
+	TSRMLS_SET_CTX(sintrospection->thread_ctx);
 	
-	RETURN_RESOURCE(sintrospection->rsrc_id);
-	
+	if (zcallback) {
+		if (!zend_is_callable(zcallback, 0, &func_name)) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
+			efree(func_name);
+			RETURN_FALSE;
+		}
+		efree(func_name);
+		
+		zval_add_ref(&zcallback);
+		if (zarg) {
+			zval_add_ref(&zarg);
+		} else {
+			ALLOC_INIT_ZVAL(zarg);
+		}
+		
+		callback = emalloc(sizeof(php_gupnp_callback_t));
+		callback->func = zcallback;
+		callback->arg = zarg;
+		
+		sintrospection->callback = callback;
+		
+		gupnp_service_info_get_introspection_async(GUPNP_SERVICE_INFO(sproxy->proxy), 
+			_php_gupnp_service_get_introspection_cb, sintrospection);
+		
+		RETURN_TRUE;
+	} else {
+		introspection = gupnp_service_info_get_introspection(GUPNP_SERVICE_INFO(sproxy->proxy), &error);
+		if (introspection == NULL) {
+			if (error != NULL) {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "%s", error->message);
+				g_error_free(error);
+			}
+			RETURN_FALSE;
+		}
+		sintrospection->callback = NULL;
+		sintrospection->introspection = introspection;
+		sintrospection->rsrc_id = zend_list_insert(sintrospection, le_service_introspection);
+		
+		RETURN_RESOURCE(sintrospection->rsrc_id);
+	}
 }
 /* }}} */
 
@@ -2142,11 +2240,31 @@ PHP_FUNCTION(gupnp_service_action_return)
 	}
 	
 	ZVAL_TO_SERVICE_ACTION(zaction, service_action);
-	
 	gupnp_service_action_return(service_action->action);
+	
 	RETURN_TRUE;
 }
 /* }}} */
+
+/* {{{ proto bool gupnp_service_action_return_error(resource action, int error_code[, string error_description])
+   Return error_code. */
+PHP_FUNCTION(gupnp_service_action_return_error)
+{
+	zval *zaction;
+	long error_code;
+	char *error_description = NULL;
+	int error_description_len;
+	php_gupnp_service_action_t *service_action;
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rl|s", &zaction, &error_code, &error_description, &error_description_len) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_SERVICE_ACTION(zaction, service_action);
+	gupnp_service_action_return_error(service_action->action, error_code, error_description);
+	
+	RETURN_TRUE;
+}
 
 
 
