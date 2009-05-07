@@ -235,8 +235,6 @@ PHP_INI_END()
 */
 /* }}} */
 
-/* {{{ _php_gupnp_callback_free
- */
 static inline void _php_gupnp_callback_free(php_gupnp_callback_t *callback) /* {{{ */
 {
 	if (!callback) {
@@ -254,8 +252,6 @@ static inline void _php_gupnp_callback_free(php_gupnp_callback_t *callback) /* {
 }
 /* }}} */
 
-/* {{{ _php_gupnp_cpoint_dtor
- */
 static void _php_gupnp_cpoint_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	int i;
@@ -271,8 +267,6 @@ static void _php_gupnp_cpoint_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ 
 }
 /* }}} */
 
-/* {{{ _php_gupnp_rdevice_dtor
- */
 static void _php_gupnp_rdevice_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_rdevice_t *rdevice = (php_gupnp_rdevice_t *)rsrc->ptr;
@@ -283,8 +277,6 @@ static void _php_gupnp_rdevice_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_dtor
- */
 static void _php_gupnp_service_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_service_t *service = (php_gupnp_service_t *)rsrc->ptr;
@@ -293,8 +285,6 @@ static void _php_gupnp_service_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_proxy_dtor
- */
 static void _php_gupnp_service_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_service_proxy_t *sproxy = (php_gupnp_service_proxy_t *)rsrc->ptr;
@@ -305,8 +295,6 @@ static void _php_gupnp_service_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) 
 }
 /* }}} */
 
-/* {{{ _php_gupnp_device_proxy_dtor
- */
 static void _php_gupnp_device_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_device_proxy_t *dproxy = (php_gupnp_device_proxy_t *)rsrc->ptr;
@@ -315,8 +303,6 @@ static void _php_gupnp_device_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /
 }
 /* }}} */
 
-/* {{{ _php_gupnp_context_dtor
- */
 static void _php_gupnp_context_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_context_t *context = (php_gupnp_context_t *)rsrc->ptr;
@@ -327,8 +313,6 @@ static void _php_gupnp_context_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_info_dtor
- */
 static void _php_gupnp_service_info_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_service_info_t *service = (php_gupnp_service_info_t *)rsrc->ptr;
@@ -339,8 +323,6 @@ static void _php_gupnp_service_info_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_introspection_dtor
- */
 static void _php_gupnp_service_introspection_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_service_introspection_t *sintrospection = (php_gupnp_service_introspection_t *)rsrc->ptr;
@@ -351,8 +333,6 @@ static void _php_gupnp_service_introspection_dtor(zend_rsrc_list_entry *rsrc TSR
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_action_dtor
- */
 static void _php_gupnp_service_action_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_service_action_t *service_action = (php_gupnp_service_action_t *)rsrc->ptr;
@@ -362,9 +342,7 @@ static void _php_gupnp_service_action_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 }
 /* }}} */
 
-/* {{{ _php_gupnp_context_timeout_cb
- */
-static gboolean _php_gupnp_context_timeout_cb(gpointer userdata)
+static gboolean _php_gupnp_context_timeout_cb(gpointer userdata) /* {{{ */
 {
 	zval *args[1];
 	php_gupnp_context_t *context = (php_gupnp_context_t *)userdata;
@@ -388,9 +366,7 @@ static gboolean _php_gupnp_context_timeout_cb(gpointer userdata)
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_proxy_cb
- */
-static void _php_gupnp_service_proxy_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, php_gupnp_callback_t *callback TSRMLS_DC)
+static void _php_gupnp_service_proxy_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, php_gupnp_callback_t *callback TSRMLS_DC)  /* {{{ */
 {
 	zval *args[2];
 	php_gupnp_service_proxy_t *sproxy;
@@ -420,9 +396,7 @@ static void _php_gupnp_service_proxy_cb(GUPnPControlPoint *cp, GUPnPServiceProxy
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_proxy_available_cb
- */
-static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata)
+static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata) /* {{{ */
 {
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
 	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
@@ -435,9 +409,7 @@ static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPSe
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_proxy_unavailable_cb
- */
-static void _php_gupnp_service_proxy_unavailable_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata)
+static void _php_gupnp_service_proxy_unavailable_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata) /* {{{ */
 {
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
 	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
@@ -450,9 +422,7 @@ static void _php_gupnp_service_proxy_unavailable_cb(GUPnPControlPoint *cp, GUPnP
 }
 /* }}} */
 
-/* {{{ _php_gupnp_device_proxy_cb
- */
-static void _php_gupnp_device_proxy_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, php_gupnp_callback_t *callback TSRMLS_DC)
+static void _php_gupnp_device_proxy_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, php_gupnp_callback_t *callback TSRMLS_DC) /* {{{ */
 {
 	zval *args[2];
 	php_gupnp_device_proxy_t *dproxy;
@@ -479,9 +449,7 @@ static void _php_gupnp_device_proxy_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *
 }
 /* }}} */
 
-/* {{{ _php_gupnp_device_proxy_available_cb
- */
-static void _php_gupnp_device_proxy_available_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, gpointer userdata)
+static void _php_gupnp_device_proxy_available_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, gpointer userdata) /* {{{ */
 {
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
 	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
@@ -494,9 +462,7 @@ static void _php_gupnp_device_proxy_available_cb(GUPnPControlPoint *cp, GUPnPDev
 }
 /* }}} */
 
-/* {{{ _php_gupnp_device_proxy_unavailable_cb
- */
-static void _php_gupnp_device_proxy_unavailable_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, gpointer userdata)
+static void _php_gupnp_device_proxy_unavailable_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *proxy, gpointer userdata) /* {{{ */
 {
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
 	TSRMLS_FETCH_FROM_CTX(cpoint ? cpoint->thread_ctx : NULL);
@@ -509,9 +475,7 @@ static void _php_gupnp_device_proxy_unavailable_cb(GUPnPControlPoint *cp, GUPnPD
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_proxy_notify_cb
- */
-static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const char *variable, GValue *value, gpointer userdata)
+static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const char *variable, GValue *value, gpointer userdata) /* {{{ */
 {
 	zval *args[3];
 	php_gupnp_service_proxy_t *sproxy = (php_gupnp_service_proxy_t *)userdata;
@@ -571,9 +535,7 @@ static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const c
 }
 /* }}} */
 
-/* {{{ _php_gupnp_subscription_lost_cb
- */
-static void _php_gupnp_subscription_lost_cb(GUPnPServiceProxy *proxy, const GError *error, gpointer userdata)
+static void _php_gupnp_subscription_lost_cb(GUPnPServiceProxy *proxy, const GError *error, gpointer userdata) /* {{{ */
 {
 	zval *args[2];
 	php_gupnp_service_proxy_t *sproxy = (php_gupnp_service_proxy_t *)userdata;
@@ -607,9 +569,8 @@ static void _php_gupnp_subscription_lost_cb(GUPnPServiceProxy *proxy, const GErr
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_action_invoked_cb
- */
-static void _php_gupnp_service_action_invoked_cb(GUPnPService *gupnp_service, GUPnPServiceAction *gupnp_action, gpointer userdata) {
+static void _php_gupnp_service_action_invoked_cb(GUPnPService *gupnp_service, GUPnPServiceAction *gupnp_action, gpointer userdata)  /* {{{ */
+{
 	zval *args[3];
 	php_gupnp_callback_t *callback;
 	php_gupnp_service_t *service;
@@ -648,9 +609,8 @@ static void _php_gupnp_service_action_invoked_cb(GUPnPService *gupnp_service, GU
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_notify_failed_cb
- */
-static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, const GList *callback_urls, const GError *error, gpointer userdata) {
+static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, const GList *callback_urls, const GError *error, gpointer userdata)  /* {{{ */
+{
 	zval *args[3];
 	php_gupnp_callback_t *callback;
 	php_gupnp_service_t *service;
@@ -691,9 +651,7 @@ static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, con
 }
 /* }}} */
 
-/* {{{ _php_gupnp_service_get_introspection_cb
- */
-static void _php_gupnp_service_get_introspection_cb(GUPnPServiceInfo *info, GUPnPServiceIntrospection *introspection, const GError *error, gpointer userdata)
+static void _php_gupnp_service_get_introspection_cb(GUPnPServiceInfo *info, GUPnPServiceIntrospection *introspection, const GError *error, gpointer userdata) /* {{{ */
 {
 	zval *args[3];
 	php_gupnp_service_introspection_t *sintrospection = (php_gupnp_service_introspection_t *)userdata;
@@ -735,9 +693,7 @@ static void _php_gupnp_service_get_introspection_cb(GUPnPServiceInfo *info, GUPn
 }
 /* }}} */
 
-/* {{{ _php_gupnp_get_value_type_name
- */
-char *_php_gupnp_get_value_type_name(GType g_type) 
+char *_php_gupnp_get_value_type_name(GType g_type)  /* {{{ */
 {
 	switch (g_type) {
 		case G_TYPE_BOOLEAN:
@@ -758,9 +714,7 @@ char *_php_gupnp_get_value_type_name(GType g_type)
 }
 /* }}} */
 
-/* {{{ _php_gupnp_get_zval_by_gvalue
- */
-zval *_php_gupnp_get_zval_by_gvalue(const GValue *g_value) 
+zval *_php_gupnp_get_zval_by_gvalue(const GValue *g_value)  /* {{{ */
 {
 	zval *z_value;
 	
@@ -797,7 +751,6 @@ zval *_php_gupnp_get_zval_by_gvalue(const GValue *g_value)
 	return z_value;
 }
 /* }}} */
-
 
 /* {{{ PHP_MINIT_FUNCTION
  */
@@ -855,7 +808,6 @@ PHP_MSHUTDOWN_FUNCTION(gupnp)
 }
 /* }}} */
 
-/* Remove if there's nothing to do at request start */
 /* {{{ PHP_RINIT_FUNCTION
  */
 PHP_RINIT_FUNCTION(gupnp)
@@ -864,7 +816,6 @@ PHP_RINIT_FUNCTION(gupnp)
 }
 /* }}} */
 
-/* Remove if there's nothing to do at request end */
 /* {{{ PHP_RSHUTDOWN_FUNCTION
  */
 PHP_RSHUTDOWN_FUNCTION(gupnp)
@@ -1682,7 +1633,6 @@ PHP_FUNCTION(gupnp_service_introspection_get_state_variable)
 }
 /* }}} */
 
-
 /* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
    Sends action with parameters to the service exposed by proxy synchronously and set value. */
 PHP_FUNCTION(gupnp_service_proxy_action_set)
@@ -2227,7 +2177,6 @@ PHP_FUNCTION(gupnp_service_thaw_notify)
 }
 /* }}} */
 
-
 /* {{{ proto bool gupnp_service_action_return(resource action)
    Return succesfully. */
 PHP_FUNCTION(gupnp_service_action_return)
@@ -2265,7 +2214,7 @@ PHP_FUNCTION(gupnp_service_action_return_error)
 	
 	RETURN_TRUE;
 }
-
+/* }}} */
 
 
 /*
