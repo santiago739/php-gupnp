@@ -7,10 +7,9 @@ PHP_ARG_WITH(gupnp, for gupnp support,
 if test "$PHP_GUPNP" != "no"; then
   SEARCH_PATH="/usr/local /usr"
   SEARCH_FOR_GUPNP="/include/gupnp-1.0/libgupnp/gupnp.h" 
-  SEARCH_FOR_GSSDP="/include/gssdp-1.0/"
-  SEARCH_FOR_LIBSOUP="/include/libsoup-2.4/"
-  SEARCH_FOR_GLIB="/include/glib-2.0/"
-  SEARCH_FOR_GLIB_LIB="/lib/glib-2.0/include/"
+  PACKAGE_GSSDP="gssdp-1.0"
+  PACKAGE_LIBSOUP="libsoup-2.4"
+  PACKAGE_GLIB="glib-2.0"
 
   if test -r $PHP_GUPNP/$SEARCH_FOR; then # path given as parameter
     GUPNP_DIR=$PHP_GUPNP
@@ -29,59 +28,49 @@ if test "$PHP_GUPNP" != "no"; then
     AC_MSG_ERROR([Please reinstall the gupnp distribution])
   fi
   
-  for i in $SEARCH_PATH ; do
-    if test -r $i/$SEARCH_FOR_GSSDP; then
-      GSSDP_DIR=$i
-      AC_MSG_RESULT($SEARCH_FOR_GSSDP found in $i)
-    fi
-  done
-
-  if test -z "$GSSDP_DIR"; then
-    AC_MSG_RESULT([$SEARCH_FOR_GSSDP not found])
-    AC_MSG_ERROR([Please reinstall the gssdp distribution])
+  AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
+  if test -z "$PKG_CONFIG"; then
+    AC_MSG_RESULT([pkg-config not found])
+    AC_MSG_ERROR([Please reinstall the pkg-config distribution])
   fi
-
-  for i in $SEARCH_PATH ; do
-    if test -r $i/$SEARCH_FOR_LIBSOUP; then
-      LIBSOUP_DIR=$i
-      AC_MSG_RESULT($SEARCH_FOR_LIBSOUP found in $i)
-    fi
-  done
-
-  if test -z "$LIBSOUP_DIR"; then
-    AC_MSG_RESULT([$SEARCH_FOR_LIBSOUP not found])
-    AC_MSG_ERROR([Please reinstall the libsoup distribution])
+  
+  AC_MSG_CHECKING([for $PACKAGE_GSSDP])
+  if test -x "$PKG_CONFIG" && $PKG_CONFIG --exists $PACKAGE_GSSDP; then
+    GSSDP_INCS=`$PKG_CONFIG $PACKAGE_GSSDP --cflags`
+	GSSDP_LIBS=`$PKG_CONFIG $PACKAGE_GSSDP --libs`
+    PHP_EVAL_LIBLINE($GSSDP_LIBS, GSSDP_SHARED_LIBADD)
+    PHP_EVAL_INCLINE($GSSDP_INCS)
+    AC_MSG_RESULT([yes])
+  else
+    AC_MSG_RESULT([not found])
+    AC_MSG_ERROR([Please reinstall the $PACKAGE_GSSDP distribution])
   fi
-
-  for i in $SEARCH_PATH ; do
-    if test -r $i/$SEARCH_FOR_GLIB; then
-      GLIB_DIR=$i
-      AC_MSG_RESULT($SEARCH_FOR_GLIB found in $i)
-    fi
-  done
-
-  if test -z "$GLIB_DIR"; then
-    AC_MSG_RESULT([$SEARCH_FOR_GLIB not found])
-    AC_MSG_ERROR([Please reinstall the glib distribution])
+  
+  AC_MSG_CHECKING([for $PACKAGE_LIBSOUP])
+  if test -x "$PKG_CONFIG" && $PKG_CONFIG --exists $PACKAGE_LIBSOUP; then
+    LIBSOUP_INCS=`$PKG_CONFIG $PACKAGE_LIBSOUP --cflags`
+	LIBSOUP_LIBS=`$PKG_CONFIG $PACKAGE_LIBSOUP --libs`
+    PHP_EVAL_LIBLINE($LIBSOUP_LIBS, LIBSOUP_SHARED_LIBADD)
+    PHP_EVAL_INCLINE($LIBSOUP_INCS)
+    AC_MSG_RESULT([yes])
+  else
+    AC_MSG_RESULT([not found])
+    AC_MSG_ERROR([Please reinstall the $PACKAGE_LIBSOUP distribution])
   fi
-
-  for i in $SEARCH_PATH ; do
-    if test -r $i/$SEARCH_FOR_GLIB_LIB; then
-      GLIB_LIB_DIR=$i
-      AC_MSG_RESULT($SEARCH_FOR_GLIB_LIB found in $i)
-    fi
-  done
-
-  if test -z "$GLIB_LIB_DIR"; then
-    AC_MSG_RESULT([$SEARCH_FOR_GLIB_LIB not found])
-    AC_MSG_ERROR([Please reinstall the glib distribution])
+  
+  AC_MSG_CHECKING([for $PACKAGE_GLIB])
+  if test -x "$PKG_CONFIG" && $PKG_CONFIG --exists $PACKAGE_GLIB; then
+    GLIB_INCS=`$PKG_CONFIG $PACKAGE_GLIB --cflags`
+	GLIB_LIBS=`$PKG_CONFIG $PACKAGE_GLIB --libs`
+    PHP_EVAL_LIBLINE($GLIB_LIBS, GLIB_SHARED_LIBADD)
+    PHP_EVAL_INCLINE($GLIB_INCS)
+    AC_MSG_RESULT([yes])
+  else
+    AC_MSG_RESULT([not found])
+    AC_MSG_ERROR([Please reinstall the $PACKAGE_GLIB distribution])
   fi
 
   PHP_ADD_INCLUDE($GUPNP_DIR/include/gupnp-1.0/)
-  PHP_ADD_INCLUDE($GSSDP_DIR/include/gssdp-1.0/)
-  PHP_ADD_INCLUDE($LIBSOUP_DIR/include/libsoup-2.4/)
-  PHP_ADD_INCLUDE($GLIB_DIR/include/glib-2.0/)
-  PHP_ADD_INCLUDE($GLIB_LIB_DIR/lib/glib-2.0/include/)
 
   LIBNAME=gupnp-1.0 
   LIBSYMBOL=gupnp_context_new
