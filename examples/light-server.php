@@ -39,16 +39,12 @@ function get_status_cb($service, $action, $arg)
 /* Target */
 function query_target_cb($service, $variable, $value, $arg)
 {
-  //g_value_init (value, G_TYPE_BOOLEAN);
-  //g_value_set_boolean (value, status);
 	printf("[CALL] query_target_cb");
 }
 
 /* Status */
 function query_status_cb($service, $variable, $value, $arg)
 {
-  //g_value_init (value, G_TYPE_BOOLEAN);
-  //g_value_set_boolean (value, status);
 	printf("[CALL] query_status_cb");
 }
 
@@ -64,16 +60,12 @@ if (!$context) {
 	exit(-1);
 }
 
-/* Host the device and service description files */
-$local_path_1 = "./BinaryLight1.xml";
-$local_path_2 = "./SwitchPower1.xml";
-$server_path_1 = "/BinaryLight1.xml";
-$server_path_2 = "/SwitchPower1.xml";
-gupnp_context_host_path($context, $local_path_1, $server_path_1);
-gupnp_context_host_path($context, $local_path_2, $server_path_2);
+/* Host the directory that contains device and service description files */
+gupnp_context_host_path($context, "./web", "");
 
 /* Create root device */
-$dev = gupnp_root_device_new($context, $server_path_1);
+$location = "/BinaryLight1.xml";
+$dev = gupnp_root_device_new($context, $location);
 gupnp_root_device_set_available($dev, true);
 
 /* Get the switch service from the root device */

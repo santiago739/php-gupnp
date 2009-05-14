@@ -42,15 +42,7 @@ function set_channel_cb($service, $action, $arg)
 
 function timeout_cb($arg)
 {
-/*
-        gupnp_service_notify (GUPNP_SERVICE (user_data),
-                              "SystemUpdateID",
-                              G_TYPE_UINT,
-                              27182818,
-                              NULL);
-*/
 	printf("Call timeout_cb\n");
-
 	return true;
 }
 
