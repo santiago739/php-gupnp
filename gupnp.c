@@ -110,6 +110,7 @@ typedef struct _php_gupnp_service_action_t { /* {{{ */
 	GUPnPServiceAction *action;
 	int rsrc_id;
 	php_gupnp_callback_t *callback;
+	php_gupnp_service_t *service;
 #ifdef ZTS
 	void ***thread_ctx;
 #endif
@@ -583,11 +584,9 @@ static void _php_gupnp_service_action_invoked_cb(GUPnPService *gupnp_service, GU
 		return;
 	}
 	
-	/* TODO: it seems that it's not right decision... */
 	MAKE_STD_ZVAL(args[0]);
-	service = emalloc(sizeof(php_gupnp_service_t));
+	service = service_action->service;
 	service->service = gupnp_service;
-	service->rsrc_id = zend_list_insert(service, le_service);
 	ZVAL_RESOURCE(args[0], service->rsrc_id);
 	zend_list_addref(service->rsrc_id);
 	
@@ -623,11 +622,9 @@ static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, con
 		return;
 	}
 	
-	/* TODO: it seems that it's not right decision... */
 	MAKE_STD_ZVAL(args[0]);
-	service = emalloc(sizeof(php_gupnp_service_t));
+	service = service_action->service;
 	service->service = gupnp_service;
-	service->rsrc_id = zend_list_insert(service, le_service);
 	ZVAL_RESOURCE(args[0], service->rsrc_id);
 	zend_list_addref(service->rsrc_id);
 	
@@ -1245,15 +1242,16 @@ PHP_FUNCTION(gupnp_device_info_get_service)
    Set device callback function for signal and action.  */
 PHP_FUNCTION(gupnp_device_action_callback_set)
 {
-	zval *zservice, *zcallback, *zarg = NULL;
+	zval *zservice_info, *zcallback, *zarg = NULL;
 	char *func_name, *action_name, *action_name_full, *signal_name;
 	int action_name_len;
 	int signal;
 	php_gupnp_callback_t *callback;
-	php_gupnp_service_info_t *service;
+	php_gupnp_service_t *service;
+	php_gupnp_service_info_t *service_info;
 	php_gupnp_service_action_t *service_action;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rlsz|z", &zservice, &signal, &action_name, &action_name_len, &zcallback, &zarg) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rlsz|z", &zservice_info, &signal, &action_name, &action_name_len, &zcallback, &zarg) == FAILURE) {
 		return;
 	}
 	
@@ -1272,7 +1270,7 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 			break;
 	}
 		
-	ZVAL_TO_SERVICE_INFO(zservice, service);
+	ZVAL_TO_SERVICE_INFO(zservice_info, service_info);
 	
 	if (!zend_is_callable(zcallback, 0, &func_name)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
@@ -1292,8 +1290,13 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 	callback->func = zcallback;
 	callback->arg = zarg;
 	
+	service = emalloc(sizeof(php_gupnp_service_t));
+	service->service = NULL;
+	service->rsrc_id = zend_list_insert(service, le_service);
+	
 	service_action = emalloc(sizeof(php_gupnp_service_action_t));
 	service_action->action = NULL;
+	service_action->service = service;
 	service_action->callback = callback;
 	service_action->rsrc_id = zend_list_insert(service_action, le_service_action);
 	TSRMLS_SET_CTX(service_action->thread_ctx);
@@ -1302,14 +1305,13 @@ PHP_FUNCTION(gupnp_device_action_callback_set)
 	strcpy(action_name_full, signal_name);
 	strcat(action_name_full, action_name);
 	
-	
 	switch (signal) {
 		case GUPNP_SIGNAL_ACTION_INVOKED:
-			g_signal_connect(service->service_info, action_name_full, G_CALLBACK(_php_gupnp_service_action_invoked_cb), service_action);
+			g_signal_connect(service_info->service_info, action_name_full, G_CALLBACK(_php_gupnp_service_action_invoked_cb), service_action);
 			break;
 			
 		case GUPNP_SIGNAL_NOTIFY_FAILED:
-			g_signal_connect(service->service_info, action_name_full, G_CALLBACK(_php_gupnp_service_notify_failed_cb), service_action);
+			g_signal_connect(service_info->service_info, action_name_full, G_CALLBACK(_php_gupnp_service_notify_failed_cb), service_action);
 			break;
 	}
 	RETURN_TRUE;

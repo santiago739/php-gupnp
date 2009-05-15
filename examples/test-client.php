@@ -111,7 +111,7 @@ function tvcontrol_set_channel($proxy, $arg)
 		printf("Set channel to %d.\n", $channel_new);
 	}
 	sleep(11);
-	if (!gupnp_service_proxy_action_set($proxy, 'SetChannel', 'Channel', $channel_new, GUPNP_TYPE_INT)) {
+	if (!gupnp_service_proxy_action_set($proxy, 'SetChannel', 'Channel', ++$channel_new, GUPNP_TYPE_INT)) {
 		printf("Cannot set channel\n");
 	} else {
 		printf("Set channel to %d.\n", $channel_new);
