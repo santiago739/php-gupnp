@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package packagerversion="1.4.11" version="2.0" xmlns="http://pear.php.net/dtd/package-2.0" xmlns:tasks="http://pear.php.net/dtd/tasks-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pear.php.net/dtd/tasks-1.0
+http://pear.php.net/dtd/tasks-1.0.xsd
+http://pear.php.net/dtd/package-2.0
+http://pear.php.net/dtd/package-2.0.xsd">
+ <name>gupnp</name>
+ <channel>pecl.php.net</channel>
+ <summary>GUPnP wrapper extension</summary>
+ <description>
+  GUPnP is an object-oriented open source framework for creating UPnP devices and control points, written in C using GObject and libsoup. This extension wraps GUPnP and provides similar API.
+ </description>
+ <lead>
+  <name>Alexey Romanenko</name>
+  <user>santiago</user>
+  <email>santiago739@gmail.com</email>
+  <active>yes</active>
+ </lead>
+ <date>2009-05-15</date>
+ <time>16:00:00</time>
+ <version>
+  <release>0.1.0</release>
+  <api>0.1.0</api>
+ </version>
+ <stability>
+  <release>alpha</release>
+  <api>alpha</api>
+ </stability>
+ <license uri="http://www.php.net/license">PHP</license>
+ <notes>- Initial PECL release.</notes>
+ <contents>
+  <dir name="/">
+   <file name="CREDITS" role="doc" />
+   <file name="config.m4" role="src" />
+   <file name="gupnp.c" role="src" />
+   <file name="php_gupnp.h" role="src" />
+   <dir name="examples">
+     <file name="light-client.php" role="php" />
+     <file name="light-server.php" role="php" />
+     <file name="test-browsing.php" role="php" />
+     <file name="test-client.php" role="php" />
+     <file name="test-server.php" role="php" />
+     <dir name="web">
+       <file name="BinaryLight1.xml" role="doc" />
+       <file name="SwitchPower1.xml" role="doc" />
+       <file name="tvcontrolSCPD.xml" role="doc" />
+       <file name="tvdevicedesc.xml" role="doc" />
+       <file name="tvdevicepres.html" role="doc" />
+       <file name="tvpictureSCPD.xml" role="doc" />
+     </dir>
+    </dir>
+  </dir> <!-- / -->
+ </contents>
+ <dependencies>
+  <required>
+   <php>
+    <min>5.2.2</min>
+    <max>6.0.0</max>
+    <exclude>6.0.0</exclude>
+   </php>
+   <pearinstaller>
+    <min>1.4.0b1</min>
+   </pearinstaller>
+  </required>
+ </dependencies>
+ <providesextension>gupnp</providesextension>
+ <extsrcrelease>
+  <configureoption default="autodetect" name="with-gupnp" prompt="Please provide the installation prefix of gupnp library" />
+ </extsrcrelease>
+ <changelog>
+ </changelog>
+</package>
