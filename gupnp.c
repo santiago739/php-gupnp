@@ -155,72 +155,6 @@ static int le_service_action;
 		ZEND_FETCH_RESOURCE(service_action, php_gupnp_service_action_t *, &zval, -1, "service action", le_service_action)
 
 
-/* {{{ gupnp_functions[]
- *
- * Every user visible function must have an entry in gupnp_functions[].
- */
-zend_function_entry gupnp_functions[] = {
-	PHP_FE(gupnp_context_new,	NULL)
-	PHP_FE(gupnp_context_get_host_ip,	NULL)
-	PHP_FE(gupnp_context_get_port,	NULL)
-	PHP_FE(gupnp_context_set_subscription_timeout,	NULL)
-	PHP_FE(gupnp_context_get_subscription_timeout,	NULL)
-	PHP_FE(gupnp_context_host_path,	NULL)
-	PHP_FE(gupnp_context_unhost_path,	NULL)
-	PHP_FE(gupnp_context_timeout_add,	NULL)
-	PHP_FE(gupnp_root_device_new,	NULL)
-	PHP_FE(gupnp_root_device_start,	NULL)
-	PHP_FE(gupnp_root_device_stop,	NULL)
-	PHP_FE(gupnp_root_device_set_available,	NULL)
-	PHP_FE(gupnp_root_device_get_available,	NULL)
-	PHP_FE(gupnp_root_device_get_relative_location,	NULL)
-	PHP_FE(gupnp_device_info_get,	NULL)
-	PHP_FE(gupnp_device_info_get_service,	NULL)
-	PHP_FE(gupnp_device_action_callback_set,	NULL)
-	PHP_FE(gupnp_control_point_new,	NULL)
-	PHP_FE(gupnp_control_point_callback_set,	NULL)
-	PHP_FE(gupnp_control_point_browse_start, 	NULL)
-	PHP_FE(gupnp_control_point_browse_stop, 	NULL)
-	PHP_FE(gupnp_service_info_get, 	NULL)
-	PHP_FE(gupnp_service_info_get_introspection, 	NULL)
-	PHP_FE(gupnp_service_introspection_get_state_variable, 	NULL)
-	PHP_FE(gupnp_service_proxy_action_set, 	NULL)
-	PHP_FE(gupnp_service_proxy_action_get, 	NULL)
-	PHP_FE(gupnp_service_proxy_set_subscribed, 	NULL)
-	PHP_FE(gupnp_service_proxy_get_subscribed, 	NULL)
-	PHP_FE(gupnp_service_proxy_add_notify, 	NULL)
-	PHP_FE(gupnp_service_proxy_remove_notify, 	NULL)
-	PHP_FE(gupnp_service_proxy_callback_set, 	NULL)
-	PHP_FE(gupnp_service_action_set, 	NULL)
-	PHP_FE(gupnp_service_action_get, 	NULL)
-	PHP_FE(gupnp_service_notify, 	NULL)
-	PHP_FE(gupnp_service_freeze_notify, 	NULL)
-	PHP_FE(gupnp_service_thaw_notify, 	NULL)
-	PHP_FE(gupnp_service_action_return, 	NULL)
-	PHP_FE(gupnp_service_action_return_error, 	NULL)
-	{NULL, NULL, NULL}	/* Must be the last line in gupnp_functions[] */
-};
-/* }}} */
-
-/* {{{ gupnp_module_entry
- */
-zend_module_entry gupnp_module_entry = {
-#if ZEND_MODULE_API_NO >= 20010901
-	STANDARD_MODULE_HEADER,
-#endif
-	"gupnp",
-	gupnp_functions,
-	PHP_MINIT(gupnp),
-	PHP_MSHUTDOWN(gupnp),
-	PHP_RINIT(gupnp),		/* Replace with NULL if there's nothing to do at request start */
-	PHP_RSHUTDOWN(gupnp),	/* Replace with NULL if there's nothing to do at request end */
-	PHP_MINFO(gupnp),
-#if ZEND_MODULE_API_NO >= 20010901
-	"0.1", /* Replace with version number for your extension */
-#endif
-	STANDARD_MODULE_PROPERTIES
-};
-/* }}} */
 
 #ifdef COMPILE_DL_GUPNP
 ZEND_GET_MODULE(gupnp)
@@ -2187,7 +2121,9 @@ PHP_FUNCTION(gupnp_service_action_return)
 	php_gupnp_service_action_t *service_action;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zaction) == FAILURE) {
-		return;
+		return;ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_context_get_subscription_timeout, 0, 0, 1)
+	ZEND_ARG_INFO(0, context)
+ZEND_END_ARG_INFO()
 	}
 	
 	ZVAL_TO_SERVICE_ACTION(zaction, service_action);
@@ -2218,6 +2154,271 @@ PHP_FUNCTION(gupnp_service_action_return_error)
 }
 /* }}} */
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_context_new, 0, 0, 0)
+	ZEND_ARG_INFO(0, host_ip)
+	ZEND_ARG_INFO(0, port)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_context_get_host_ip, 0, 0, 1)
+	ZEND_ARG_INFO(0, context)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_context_get_port, 0, 0, 1)
+	ZEND_ARG_INFO(0, context)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_context_set_subscription_timeout, 0, 0, 2)
+	ZEND_ARG_INFO(0, context)
+	ZEND_ARG_INFO(0, timeout)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_context_get_subscription_timeout, 0, 0, 1)
+	ZEND_ARG_INFO(0, context)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_context_host_path, 0, 0, 3)
+	ZEND_ARG_INFO(0, context)
+	ZEND_ARG_INFO(0, local_path)
+	ZEND_ARG_INFO(0, server_path)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_context_unhost_path, 0, 0, 2)
+	ZEND_ARG_INFO(0, context)
+	ZEND_ARG_INFO(0, server_path)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_context_timeout_add, 0, 0, 2)
+	ZEND_ARG_INFO(0, timeout)
+	ZEND_ARG_INFO(0, callback)
+	ZEND_ARG_INFO(0, arg)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_root_device_new, 0, 0, 2)
+	ZEND_ARG_INFO(0, context)
+	ZEND_ARG_INFO(0, location)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_root_device_start, 0, 0, 1)
+	ZEND_ARG_INFO(0, root_device)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_root_device_stop, 0, 0, 1)
+	ZEND_ARG_INFO(0, root_device)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_root_device_set_available, 0, 0, 2)
+	ZEND_ARG_INFO(0, root_device)
+	ZEND_ARG_INFO(0, available)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_root_device_get_available, 0, 0, 1)
+	ZEND_ARG_INFO(0, root_device)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_root_device_get_relative_location, 0, 0, 1)
+	ZEND_ARG_INFO(0, root_device)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_device_info_get, 0, 0, 1)
+	ZEND_ARG_INFO(0, root_device)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_device_info_get_service, 0, 0, 2)
+	ZEND_ARG_INFO(0, root_device)
+	ZEND_ARG_INFO(0, type)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_device_action_callback_set, 0, 0, 4)
+	ZEND_ARG_INFO(0, root_device)
+	ZEND_ARG_INFO(0, signal)
+	ZEND_ARG_INFO(0, action_name)
+	ZEND_ARG_INFO(0, callback)
+	ZEND_ARG_INFO(0, arg)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_control_point_new, 0, 0, 2)
+	ZEND_ARG_INFO(0, context)
+	ZEND_ARG_INFO(0, target)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_control_point_callback_set, 0, 0, 3)
+	ZEND_ARG_INFO(0, cpoint)
+	ZEND_ARG_INFO(0, signal)
+	ZEND_ARG_INFO(0, callback)
+	ZEND_ARG_INFO(0, arg)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_control_point_browse_start, 0, 0, 1)
+	ZEND_ARG_INFO(0, cpoint)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_control_point_browse_stop, 0, 0, 1)
+	ZEND_ARG_INFO(0, cpoint)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_info_get, 0, 0, 1)
+	ZEND_ARG_INFO(0, proxy)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_info_get_introspection, 0, 0, 1)
+	ZEND_ARG_INFO(0, proxy)
+	ZEND_ARG_INFO(0, callback)
+	ZEND_ARG_INFO(0, arg)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_introspection_get_state_variable, 0, 0, 2)
+	ZEND_ARG_INFO(0, introspection)
+	ZEND_ARG_INFO(0, variable_name)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_proxy_action_set, 0, 0, 5)
+	ZEND_ARG_INFO(0, proxy)
+	ZEND_ARG_INFO(0, action)
+	ZEND_ARG_INFO(0, name)
+	ZEND_ARG_INFO(0, value)
+	ZEND_ARG_INFO(0, type)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_proxy_action_get, 0, 0, 4)
+	ZEND_ARG_INFO(0, proxy)
+	ZEND_ARG_INFO(0, action)
+	ZEND_ARG_INFO(0, name)
+	ZEND_ARG_INFO(0, type)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_proxy_set_subscribed, 0, 0, 2)
+	ZEND_ARG_INFO(0, proxy)
+	ZEND_ARG_INFO(0, subscribed)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_proxy_get_subscribed, 0, 0, 1)
+	ZEND_ARG_INFO(0, proxy)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_proxy_add_notify, 0, 0, 4)
+	ZEND_ARG_INFO(0, proxy)
+	ZEND_ARG_INFO(0, value)
+	ZEND_ARG_INFO(0, type)
+	ZEND_ARG_INFO(0, callback)
+	ZEND_ARG_INFO(0, arg)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_proxy_remove_notify, 0, 0, 2)
+	ZEND_ARG_INFO(0, proxy)
+	ZEND_ARG_INFO(0, value)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_proxy_callback_set, 0, 0, 3)
+	ZEND_ARG_INFO(0, cpoint)
+	ZEND_ARG_INFO(0, signal)
+	ZEND_ARG_INFO(0, callback)
+	ZEND_ARG_INFO(0, arg)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_action_set, 0, 0, 4)
+	ZEND_ARG_INFO(0, action)
+	ZEND_ARG_INFO(0, name)
+	ZEND_ARG_INFO(0, type)
+	ZEND_ARG_INFO(0, value)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_action_get, 0, 0, 3)
+	ZEND_ARG_INFO(0, action)
+	ZEND_ARG_INFO(0, name)
+	ZEND_ARG_INFO(0, type)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_notify, 0, 0, 4)
+	ZEND_ARG_INFO(0, service)
+	ZEND_ARG_INFO(0, name)
+	ZEND_ARG_INFO(0, type)
+	ZEND_ARG_INFO(0, value)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_freeze_notify, 0, 0, 1)
+	ZEND_ARG_INFO(0, service)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_thaw_notify, 0, 0, 1)
+	ZEND_ARG_INFO(0, service)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_action_return, 0, 0, 1)
+	ZEND_ARG_INFO(0, action)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_action_return_error, 0, 0, 2)
+	ZEND_ARG_INFO(0, action)
+	ZEND_ARG_INFO(0, error_code)
+	ZEND_ARG_INFO(0, error_description)
+ZEND_END_ARG_INFO()
+
+/* {{{ gupnp_functions[]
+ *
+ * Every user visible function must have an entry in gupnp_functions[].
+ */
+zend_function_entry gupnp_functions[] = {
+	PHP_FE(gupnp_context_new,	arginfo_gupnp_context_new)
+	PHP_FE(gupnp_context_get_host_ip,	arginfo_gupnp_context_get_host_ip)
+	PHP_FE(gupnp_context_get_port,	arginfo_gupnp_context_get_port)
+	PHP_FE(gupnp_context_set_subscription_timeout,	arginfo_gupnp_context_set_subscription_timeout)
+	PHP_FE(gupnp_context_get_subscription_timeout,	arginfo_gupnp_context_get_subscription_timeout)
+	PHP_FE(gupnp_context_host_path,	arginfo_gupnp_context_host_path)
+	PHP_FE(gupnp_context_unhost_path,	arginfo_gupnp_context_unhost_path)
+	PHP_FE(gupnp_context_timeout_add,	arginfo_gupnp_context_timeout_add)
+	PHP_FE(gupnp_root_device_new,	arginfo_gupnp_root_device_new)
+	PHP_FE(gupnp_root_device_start,	arginfo_gupnp_root_device_start)
+	PHP_FE(gupnp_root_device_stop,	arginfo_gupnp_root_device_stop)
+	PHP_FE(gupnp_root_device_set_available,	arginfo_gupnp_root_device_set_available)
+	PHP_FE(gupnp_root_device_get_available,	arginfo_gupnp_root_device_get_available)
+	PHP_FE(gupnp_root_device_get_relative_location,	arginfo_gupnp_root_device_get_relative_location)
+	PHP_FE(gupnp_device_info_get,	arginfo_gupnp_device_info_get)
+	PHP_FE(gupnp_device_info_get_service,	arginfo_gupnp_device_info_get_service)
+	PHP_FE(gupnp_device_action_callback_set,	arginfo_gupnp_device_action_callback_set)
+	PHP_FE(gupnp_control_point_new,	arginfo_gupnp_control_point_new)
+	PHP_FE(gupnp_control_point_callback_set,	arginfo_gupnp_control_point_callback_set)
+	PHP_FE(gupnp_control_point_browse_start, 	arginfo_gupnp_control_point_browse_start)
+	PHP_FE(gupnp_control_point_browse_stop, 	arginfo_gupnp_control_point_browse_stop)
+	PHP_FE(gupnp_service_info_get, 	arginfo_gupnp_service_info_get)
+	PHP_FE(gupnp_service_info_get_introspection, 	arginfo_gupnp_service_info_get_introspection)
+	PHP_FE(gupnp_service_introspection_get_state_variable, 	arginfo_gupnp_service_introspection_get_state_variable)
+	PHP_FE(gupnp_service_proxy_action_set, 	arginfo_gupnp_service_proxy_action_set)
+	PHP_FE(gupnp_service_proxy_action_get, 	arginfo_gupnp_service_proxy_action_get)
+	PHP_FE(gupnp_service_proxy_set_subscribed, 	arginfo_gupnp_service_proxy_set_subscribed)
+	PHP_FE(gupnp_service_proxy_get_subscribed, 	arginfo_gupnp_service_proxy_get_subscribed)
+	PHP_FE(gupnp_service_proxy_add_notify, 	arginfo_gupnp_service_proxy_add_notify)
+	PHP_FE(gupnp_service_proxy_remove_notify, 	arginfo_gupnp_service_proxy_remove_notify)
+	PHP_FE(gupnp_service_proxy_callback_set, 	arginfo_gupnp_service_proxy_callback_set)
+	PHP_FE(gupnp_service_action_set, 	arginfo_gupnp_service_action_set)
+	PHP_FE(gupnp_service_action_get, 	arginfo_gupnp_service_action_get)
+	PHP_FE(gupnp_service_notify, 	arginfo_gupnp_service_notify)
+	PHP_FE(gupnp_service_freeze_notify, 	arginfo_gupnp_service_freeze_notify)
+	PHP_FE(gupnp_service_thaw_notify, 	arginfo_gupnp_service_thaw_notify)
+	PHP_FE(gupnp_service_action_return, 	arginfo_gupnp_service_action_return)
+	PHP_FE(gupnp_service_action_return_error, 	arginfo_gupnp_service_action_return_error)
+	{NULL, NULL, NULL}	/* Must be the last line in gupnp_functions[] */
+};
+/* }}} */
+
+/* {{{ gupnp_module_entry
+ */
+zend_module_entry gupnp_module_entry = {
+#if ZEND_MODULE_API_NO >= 20010901
+	STANDARD_MODULE_HEADER,
+#endif
+	"gupnp",
+	gupnp_functions,
+	PHP_MINIT(gupnp),
+	PHP_MSHUTDOWN(gupnp),
+	PHP_RINIT(gupnp),		/* Replace with NULL if there's nothing to do at request start */
+	PHP_RSHUTDOWN(gupnp),	/* Replace with NULL if there's nothing to do at request end */
+	PHP_MINFO(gupnp),
+#if ZEND_MODULE_API_NO >= 20010901
+	"0.1", /* Replace with version number for your extension */
+#endif
+	STANDARD_MODULE_PROPERTIES
+};
+/* }}} */
 
 /*
  
