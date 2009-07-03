@@ -1,4 +1,4 @@
-/*
+	/*
   +----------------------------------------------------------------------+
   | PHP Version 5                                                        |
   +----------------------------------------------------------------------+
@@ -28,6 +28,10 @@
 #include "php_gupnp.h"
 
 ZEND_DECLARE_MODULE_GLOBALS(gupnp)
+
+#ifndef Z_ADDREF_P
+# define Z_ADDREF_P(x) (x)->refcount++
+#endif
 
 typedef struct _php_gupnp_callback_t { /* {{{ */
     zval *func;
@@ -154,8 +158,11 @@ static int le_service_action;
 #define ZVAL_TO_SERVICE_ACTION(zval, service_action) \
 		ZEND_FETCH_RESOURCE(service_action, php_gupnp_service_action_t *, &zval, -1, "service action", le_service_action)
 
-
-
+#if PHP_VERSION_ID >= 50300
+# define zend_is_callable(callable, check_flags, callable_name) \
+		 zend_is_callable(callable, check_flags, callable_name TSRMLS_CC) 
+#endif
+		
 #ifdef COMPILE_DL_GUPNP
 ZEND_GET_MODULE(gupnp)
 #endif
@@ -290,7 +297,8 @@ static gboolean _php_gupnp_context_timeout_cb(gpointer userdata) /* {{{ */
 	
 	callback = context->callback_timeout;
 	args[0] = callback->arg;
-	args[0]->refcount++;
+	//args[0]->refcount++;
+	Z_ADDREF_P(callback->arg);
 	
 	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 1, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
@@ -319,7 +327,7 @@ static void _php_gupnp_service_proxy_cb(GUPnPControlPoint *cp, GUPnPServiceProxy
 	zend_list_addref(sproxy->rsrc_id);
 	
 	args[1] = callback->arg;
-	args[1]->refcount++;
+	Z_ADDREF_P(callback->arg);
 	
 	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 2, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
@@ -372,7 +380,7 @@ static void _php_gupnp_device_proxy_cb(GUPnPControlPoint *cp, GUPnPDeviceProxy *
 	zend_list_addref(dproxy->rsrc_id);
 	
 	args[1] = callback->arg;
-	args[1]->refcount++;
+	Z_ADDREF_P(callback->arg);
 	
 	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 2, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
@@ -457,7 +465,7 @@ static void _php_gupnp_service_proxy_notify_cb(GUPnPServiceProxy *proxy, const c
 	
 	callback = sproxy->callback;
 	args[2] = callback->arg;
-	args[2]->refcount++;
+	Z_ADDREF_P(callback->arg);
 	
 	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 3, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
@@ -492,7 +500,7 @@ static void _php_gupnp_subscription_lost_cb(GUPnPServiceProxy *proxy, const GErr
 	
 	callback = sproxy->callback_signal;
 	args[1] = callback->arg;
-	args[1]->refcount++;
+	Z_ADDREF_P(callback->arg);
 	
 	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 2, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
@@ -531,7 +539,7 @@ static void _php_gupnp_service_action_invoked_cb(GUPnPService *gupnp_service, GU
 	
 	callback = service_action->callback;
 	args[2] = callback->arg;
-	args[2]->refcount++;
+	Z_ADDREF_P(callback->arg);
 	
 	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 3, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
@@ -571,7 +579,7 @@ static void _php_gupnp_service_notify_failed_cb(GUPnPService *gupnp_service, con
 	
 	callback = service_action->callback;
 	args[2] = callback->arg;
-	args[2]->refcount++;
+	Z_ADDREF_P(callback->arg);
 	
 	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 3, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
@@ -611,7 +619,7 @@ static void _php_gupnp_service_get_introspection_cb(GUPnPServiceInfo *info, GUPn
 	
 	callback = sintrospection->callback;
 	args[2] = callback->arg;
-	args[2]->refcount++;
+	Z_ADDREF_P(callback->arg);
 	
 	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 3, args TSRMLS_CC) == SUCCESS) {
 		zval_dtor(&retval);
