@@ -1,4 +1,4 @@
-	/*
+/*
   +----------------------------------------------------------------------+
   | PHP Version 5                                                        |
   +----------------------------------------------------------------------+
@@ -167,16 +167,6 @@ static int le_service_action;
 ZEND_GET_MODULE(gupnp)
 #endif
 
-/* {{{ PHP_INI
- */
-/* Remove comments and fill if you need to have entries in php.ini
-PHP_INI_BEGIN()
-    STD_PHP_INI_ENTRY("gupnp.global_value",      "42", PHP_INI_ALL, OnUpdateLong, global_value, zend_gupnp_globals, gupnp_globals)
-    STD_PHP_INI_ENTRY("gupnp.global_string", "foobar", PHP_INI_ALL, OnUpdateString, global_string, zend_gupnp_globals, gupnp_globals)
-PHP_INI_END()
-*/
-/* }}} */
-
 static inline void _php_gupnp_callback_free(php_gupnp_callback_t *callback) /* {{{ */
 {
 	if (!callback) {
@@ -297,7 +287,6 @@ static gboolean _php_gupnp_context_timeout_cb(gpointer userdata) /* {{{ */
 	
 	callback = context->callback_timeout;
 	args[0] = callback->arg;
-	//args[0]->refcount++;
 	Z_ADDREF_P(callback->arg);
 	
 	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 1, args TSRMLS_CC) == SUCCESS) {
@@ -695,10 +684,6 @@ zval *_php_gupnp_get_zval_by_gvalue(const GValue *g_value)  /* {{{ */
  */
 PHP_MINIT_FUNCTION(gupnp)
 {
-	/* If you have INI entries, uncomment these lines 
-	REGISTER_INI_ENTRIES();
-	*/
-	
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_BOOLEAN", G_TYPE_BOOLEAN,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_INT", G_TYPE_INT,  CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("GUPNP_TYPE_LONG", G_TYPE_LONG,  CONST_CS | CONST_PERSISTENT);
@@ -739,10 +724,6 @@ PHP_MINIT_FUNCTION(gupnp)
  */
 PHP_MSHUTDOWN_FUNCTION(gupnp)
 {
-	/* uncomment this line if you have INI entries
-	UNREGISTER_INI_ENTRIES();
-	*/
-	
 	return SUCCESS;
 }
 /* }}} */
@@ -770,10 +751,6 @@ PHP_MINFO_FUNCTION(gupnp)
 	php_info_print_table_start();
 	php_info_print_table_header(2, "gupnp support", "enabled");
 	php_info_print_table_end();
-
-	/* Remove comments if you have entries in php.ini
-	DISPLAY_INI_ENTRIES();
-	*/
 }
 /* }}} */
 
@@ -920,7 +897,7 @@ PHP_FUNCTION(gupnp_context_unhost_path)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_timeout_add(int timeout, mixed callback[, mixed arg]) 
+/* {{{ proto bool gupnp_timeout_add(resource context, int timeout, mixed callback[, mixed arg]) 
    Sets a function to be called at regular intervals.  */
 PHP_FUNCTION(gupnp_context_timeout_add)
 {
