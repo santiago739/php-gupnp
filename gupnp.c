@@ -1580,7 +1580,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_set)
 				result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
 							&error, param_name, param_type, Z_BVAL_P(param_val), NULL, NULL);
 			} else {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' is not boolean");
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not boolean");
 				return;
 			}
 			break; 
@@ -1591,7 +1591,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_set)
 				result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
 							&error, param_name, param_type, Z_LVAL_P(param_val), NULL, NULL);
 			} else {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' is not integer");
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not integer");
 				return;
 			}
 			break; 
@@ -1602,7 +1602,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_set)
 				result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
 							&error, param_name, param_type, Z_DVAL_P(param_val), NULL, NULL);
 			} else {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' is not float");
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not float");
 				return;
 			}
 			break; 
@@ -1612,13 +1612,13 @@ PHP_FUNCTION(gupnp_service_proxy_action_set)
 				result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
 							&error, param_name, param_type, Z_STRVAL_P(param_val), NULL, NULL);
 			} else {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_val' is not string");
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not string");
 				return;
 			}
 			break; 
 
 		default: 
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_type' is not correctly defined");
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'type' is not correctly defined");
 			return;
 	}
 	
@@ -1634,7 +1634,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_set)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, int type)
+/* {{{ proto mixed gupnp_service_proxy_action_set(resource proxy, string action, string name, int type)
    Sends action with parameters to the service exposed by proxy synchronously and get value. */
 PHP_FUNCTION(gupnp_service_proxy_action_get)
 {
@@ -1698,7 +1698,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 		}
 			
 		default: 
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'param_type' is not correctly defined");
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'type' is not correctly defined");
 			return;
 	}
 	
@@ -1710,8 +1710,8 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 }
 /* }}} */
 
-/* {{{ proto void gupnp_service_proxy_set_subscribed(resource proxy, boolean subscribed)
-   (Un)subscribes to this service. */
+/* {{{ proto bool gupnp_service_proxy_set_subscribed(resource proxy, boolean subscribed)
+   (Un)subscribes to the service. */
 PHP_FUNCTION(gupnp_service_proxy_set_subscribed)
 {
 	zval *zproxy;
@@ -1730,11 +1730,13 @@ PHP_FUNCTION(gupnp_service_proxy_set_subscribed)
 	}
 	
 	gupnp_service_proxy_set_subscribed(sproxy->proxy, subscribed);
+	
+	RETURN_TRUE;
 }
 /* }}} */
 
 /* {{{ proto bool gupnp_service_proxy_get_subscribed(resource proxy)
-   Returns true if we are subscribed to this service. */
+   Check whether subscription is valid to the service. */
 PHP_FUNCTION(gupnp_service_proxy_get_subscribed)
 {
 	zval *zproxy;
@@ -1824,8 +1826,8 @@ PHP_FUNCTION(gupnp_service_proxy_remove_notify)
 }
 /* }}} */
 
-/* {{{ proto bool gupnp_browse_service(resource cpoint, int signal, mixed callback[, mixed arg])
-   Set control point callback function for signal. */
+/* {{{ proto bool gupnp_browse_service(resource proxy, int signal, mixed callback[, mixed arg])
+   Sets service proxy callback for signal. */
 PHP_FUNCTION(gupnp_service_proxy_callback_set)
 {
 	zval *zproxy, *zcallback, *zarg = NULL;
@@ -1994,7 +1996,7 @@ PHP_FUNCTION(gupnp_service_action_get)
 /* }}} */
 
 /* {{{ proto bool gupnp_service_notify(resource service, string name, int type, mixed value)
-   Notifies listening clients that the properties listed in Varargs have changed to the specified values. */
+   Notifies listening clients that the property have changed to the specified values. */
 PHP_FUNCTION(gupnp_service_notify)
 {
 	zval *zservice, *param_val;
@@ -2091,7 +2093,7 @@ PHP_FUNCTION(gupnp_service_thaw_notify)
 	}
 	
 	ZVAL_TO_SERVICE(zservice, service);
-	
+
 	gupnp_service_thaw_notify(service->service);
 	
 	RETURN_TRUE;
@@ -2106,12 +2108,11 @@ PHP_FUNCTION(gupnp_service_action_return)
 	php_gupnp_service_action_t *service_action;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zaction) == FAILURE) {
-		return;ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_context_get_subscription_timeout, 0, 0, 1)
-	ZEND_ARG_INFO(0, context)
-ZEND_END_ARG_INFO()
+		return;
 	}
 	
 	ZVAL_TO_SERVICE_ACTION(zaction, service_action);
+	
 	gupnp_service_action_return(service_action->action);
 	
 	RETURN_TRUE;
