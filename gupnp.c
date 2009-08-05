@@ -84,6 +84,18 @@ typedef struct _php_gupnp_service_proxy_t { /* {{{ */
 } php_gupnp_service_proxy_t;
 /* }}} */
 
+/*
+typedef struct _php_gupnp_service_proxy_action_t { / {{{ /
+	//GUPnPServiceAction *action;
+	int rsrc_id;
+	php_gupnp_callback_t *callback;
+	//php_gupnp_service_t *service;
+#ifdef ZTS
+	void ***thread_ctx;
+#endif
+} php_gupnp_service_proxy_action_t; */
+/* }}} */
+
 typedef struct _php_gupnp_device_proxy_t { /* {{{ */
 	GUPnPDeviceProxy *proxy;
 	int rsrc_id;
@@ -126,6 +138,7 @@ static int le_cpoint;
 static int le_rdevice;
 static int le_service;
 static int le_service_proxy;
+//static int le_service_proxy_action;
 static int le_device_proxy;
 static int le_service_info;
 static int le_service_introspection;
@@ -227,6 +240,15 @@ static void _php_gupnp_service_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) 
 }
 /* }}} */
 
+/*static void _php_gupnp_service_proxy_action_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) / {{{ /
+{
+	php_gupnp_service_proxy_action_t *sp_action = (php_gupnp_service_proxy_action_t *)rsrc->ptr;
+	
+	_php_gupnp_callback_free(sp_action->callback);
+	efree(sp_action);
+}*/
+/* }}} */
+
 static void _php_gupnp_device_proxy_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	php_gupnp_device_proxy_t *dproxy = (php_gupnp_device_proxy_t *)rsrc->ptr;
@@ -324,6 +346,63 @@ static void _php_gupnp_service_proxy_cb(GUPnPControlPoint *cp, GUPnPServiceProxy
 	zval_ptr_dtor(&(args[0]));
 	zval_ptr_dtor(&(args[1]));
 
+	return;
+}
+/* }}} */
+
+//static void _php_gupnp_service_proxy_action_cb(GUPnPServiceProxy *proxy, GUPnPServiceProxyAction *action, gpointer user_data TSRMLS_DC)  /* {{{ */
+static void _php_gupnp_service_proxy_action_cb(GUPnPServiceProxy *proxy, GUPnPServiceProxyAction *action, gpointer user_data)
+{
+	char       *didl_xml;
+	guint32     number_returned;
+	guint32     total_matches;
+	GError     *error;
+
+	didl_xml = NULL;
+	error = NULL;
+	
+	zval *args[2];
+	zval retval;
+	
+	printf("[func] _php_gupnp_service_proxy_action_cb\n");
+	
+	gupnp_service_proxy_end_action(
+		proxy,
+		action,
+		&error,
+		/* OUT args */
+		"Result",
+		G_TYPE_STRING,
+		&didl_xml,
+		"NumberReturned",
+		G_TYPE_UINT,
+		&number_returned,
+		"TotalMatches",
+		G_TYPE_UINT,
+		&total_matches,
+		NULL
+	);
+	
+	printf("didl_xml: %s\n\n", didl_xml);
+	
+	/*
+	MAKE_STD_ZVAL(args[0]);
+	ZVAL_STRING(args[0], (char *)didl_xml, 1); 
+	
+	if (error && error->message) {
+		MAKE_STD_ZVAL(args[1]);
+		ZVAL_STRING(args[1], (char *)error->message, 1); 
+		g_error_free(error);
+	} else {
+		ALLOC_INIT_ZVAL(args[1]);
+	}
+	
+	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 2, args TSRMLS_CC) == SUCCESS) {
+		zval_dtor(&retval);
+	}
+	zval_ptr_dtor(&(args[0]));
+	zval_ptr_dtor(&(args[1]));
+	*/
 	return;
 }
 /* }}} */
@@ -707,6 +786,7 @@ PHP_MINIT_FUNCTION(gupnp)
 	le_rdevice = zend_register_list_destructors_ex(_php_gupnp_rdevice_dtor, NULL, "root device", module_number);
 	le_service = zend_register_list_destructors_ex(_php_gupnp_service_dtor, NULL, "service", module_number);
 	le_service_proxy = zend_register_list_destructors_ex(_php_gupnp_service_proxy_dtor, NULL, "service proxy", module_number);
+	//le_service_proxy_action = zend_register_list_destructors_ex(_php_gupnp_service_proxy_action_dtor, NULL, "service proxy action", module_number);
 	le_device_proxy = zend_register_list_destructors_ex(_php_gupnp_device_proxy_dtor, NULL, "device proxy", module_number);
 	le_service_info = zend_register_list_destructors_ex(_php_gupnp_service_info_dtor, NULL, "service info", module_number);
 	le_service_introspection = zend_register_list_destructors_ex(_php_gupnp_service_introspection_dtor, NULL, "service introspection", module_number);
@@ -1555,7 +1635,7 @@ PHP_FUNCTION(gupnp_service_introspection_get_state_variable)
 /* }}} */
 
 /* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
-   Sends action with parameters to the service exposed by proxy synchronously and set value. */
+   Send action with parameters to the service exposed by proxy synchronously and set value. */
 PHP_FUNCTION(gupnp_service_proxy_action_set)
 {
 	zval *zproxy, *param_val;
@@ -1635,7 +1715,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_set)
 /* }}} */
 
 /* {{{ proto mixed gupnp_service_proxy_action_set(resource proxy, string action, string name, int type)
-   Sends action with parameters to the service exposed by proxy synchronously and get value. */
+   Send action with parameters to the service exposed by proxy synchronously and get value. */
 PHP_FUNCTION(gupnp_service_proxy_action_get)
 {
 	zval *zproxy;
@@ -1663,6 +1743,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 			if (result) {
 				RETURN_BOOL(value_gboolean);
 			}
+			break; 
 		}
 		
 		case G_TYPE_INT:
@@ -1674,6 +1755,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 			if (result) {
 				RETURN_LONG(value_glong);
 			}
+			break; 
 		}
 		
 		case G_TYPE_FLOAT:
@@ -1685,6 +1767,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 			if (result) {
 				RETURN_DOUBLE(value_gdouble);
 			}
+			break; 
 		}
 			
 		case G_TYPE_STRING: 
@@ -1695,6 +1778,7 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 			if (result) {
 				RETURN_STRING((char *)value_gchar, 1);
 			}
+			break; 
 		}
 			
 		default: 
@@ -1709,6 +1793,208 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 	RETURN_FALSE;
 }
 /* }}} */
+
+static void browse_cb (GUPnPServiceProxy *content_dir, GUPnPServiceProxyAction *action, gpointer ser_data)
+{
+        //BrowseData *data;
+        char       *didl_xml;
+        guint32     number_returned;
+        guint32     total_matches;
+        GError     *error;
+
+        //data = (BrowseData *) user_data;
+        didl_xml = NULL;
+        error = NULL;
+
+        gupnp_service_proxy_end_action (content_dir,
+                                        action,
+                                        &error,
+                                        /* OUT args */
+                                        "Result",
+                                        G_TYPE_STRING,
+                                        &didl_xml,
+                                        "NumberReturned",
+                                        G_TYPE_UINT,
+                                        &number_returned,
+                                        "TotalMatches",
+                                        G_TYPE_UINT,
+                                        &total_matches,
+                                        NULL);
+        if (didl_xml) {
+				printf("[func] browse_cb\n");
+				printf("didl_xml: %s\n", didl_xml);
+				
+				g_free (didl_xml);
+        } else if (error) {
+                GUPnPServiceInfo *info;
+
+                info = GUPNP_SERVICE_INFO (content_dir);
+                g_warning ("Failed to browse '%s': %s\n",
+                           gupnp_service_info_get_location (info),
+                           error->message);
+
+                g_error_free (error);
+        }
+
+        //browse_data_free (data);
+}
+
+/* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
+   Send action with parameters to the service exposed by proxy asynchronously, calling callback on completion. */
+PHP_FUNCTION(gupnp_service_proxy_begin_action)
+{
+	zval *zproxy;
+	//zval *param_val;
+	//char *action, *param_name;
+	//int action_len, param_name_len;
+	//long param_type;
+	php_gupnp_service_proxy_t *sproxy;
+	//GError *error = NULL;
+	//gboolean result = 0;
+	
+	//zval *zcallback = NULL, *zarg = NULL;
+	//char *func_name;
+	//php_gupnp_callback_t *callback;
+	//php_gupnp_service_proxy_t *sproxy;
+	//php_gupnp_service_proxy_action_t *sp_action;
+	
+	/*
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rsszlz|z", 
+			&zproxy, &action, &action_len, &param_name, &param_name_len, 
+			&param_val, &param_type, &zcallback, &zarg) == FAILURE) {
+		return;
+	}
+	*/
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zproxy) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
+	
+	/*
+	if (!zend_is_callable(zcallback, 0, &func_name)) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "'%s' is not a valid callback", func_name);
+		efree(func_name);
+		RETURN_FALSE;
+	}
+	efree(func_name);
+	
+	zval_add_ref(&zcallback);
+	if (zarg) {
+		zval_add_ref(&zarg);
+	} else {
+		ALLOC_INIT_ZVAL(zarg);
+	}
+	
+	callback = emalloc(sizeof(php_gupnp_callback_t));
+	callback->func = zcallback;
+	callback->arg = zarg;
+	
+	sp_action = emalloc(sizeof(php_gupnp_service_action_t));
+	sp_action->callback = callback;
+	sp_action->rsrc_id = zend_list_insert(sp_action, le_service_proxy_action);
+	TSRMLS_SET_CTX(sp_action->thread_ctx);
+	
+	gupnp_service_proxy_begin_action(sproxy->proxy, action, 
+		_php_gupnp_service_proxy_action_cb, sp_action, 
+		param_name, param_type, Z_STRVAL_P(param_val), NULL);
+	*/
+	
+	gupnp_service_proxy_begin_action(
+		sproxy->proxy,
+		"Browse",
+		_php_gupnp_service_proxy_action_cb,
+		//browse_cb,
+		NULL,
+		/* IN args */
+		"ObjectID",
+		G_TYPE_STRING,
+		"0",
+		"BrowseFlag",
+		G_TYPE_STRING,
+		"BrowseDirectChildren",
+		"Filter",
+		G_TYPE_STRING,
+		"*",
+		"StartingIndex",
+		G_TYPE_UINT,
+		1,
+		"RequestedCount",
+		G_TYPE_UINT,
+		10,
+		"SortCriteria",
+		G_TYPE_STRING,
+		"",
+		NULL
+	);
+	printf("[func] gupnp_service_proxy_begin_action\n");
+	
+	RETURN_TRUE;
+	
+	
+	/*
+	switch (param_type) {
+		case G_TYPE_BOOLEAN:
+			if (Z_TYPE_P(param_val) == IS_BOOL) {
+				result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
+							&error, param_name, param_type, Z_BVAL_P(param_val), NULL, NULL);
+			} else {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not boolean");
+				return;
+			}
+			break; 
+		
+		case G_TYPE_INT:
+		case G_TYPE_LONG:
+			if (Z_TYPE_P(param_val) == IS_LONG) {
+				result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
+							&error, param_name, param_type, Z_LVAL_P(param_val), NULL, NULL);
+			} else {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not integer");
+				return;
+			}
+			break; 
+		
+		case G_TYPE_FLOAT: 
+		case G_TYPE_DOUBLE: 
+			if (Z_TYPE_P(param_val) == IS_DOUBLE) {
+				result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
+							&error, param_name, param_type, Z_DVAL_P(param_val), NULL, NULL);
+			} else {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not float");
+				return;
+			}
+			break; 
+			
+		case G_TYPE_STRING: 
+			if (Z_TYPE_P(param_val) == IS_STRING) {
+				result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
+							&error, param_name, param_type, Z_STRVAL_P(param_val), NULL, NULL);
+			} else {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not string");
+				return;
+			}
+			break; 
+
+		default: 
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "'type' is not correctly defined");
+			return;
+	}
+	*/
+	
+	/*
+	if (result) {
+		RETURN_TRUE;
+	} else {
+		if (error != NULL) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to send action: %s", error->message);
+			g_error_free(error);
+		}
+		RETURN_FALSE;
+	}*/
+}
+/* }}} */
+
 
 /* {{{ proto bool gupnp_service_proxy_set_subscribed(resource proxy, boolean subscribed)
    (Un)subscribes to the service. */
@@ -2370,6 +2656,7 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_service_introspection_get_state_variable, 	arginfo_gupnp_service_introspection_get_state_variable)
 	PHP_FE(gupnp_service_proxy_action_set, 	arginfo_gupnp_service_proxy_action_set)
 	PHP_FE(gupnp_service_proxy_action_get, 	arginfo_gupnp_service_proxy_action_get)
+	PHP_FE(gupnp_service_proxy_begin_action, 	NULL)
 	PHP_FE(gupnp_service_proxy_set_subscribed, 	arginfo_gupnp_service_proxy_set_subscribed)
 	PHP_FE(gupnp_service_proxy_get_subscribed, 	arginfo_gupnp_service_proxy_get_subscribed)
 	PHP_FE(gupnp_service_proxy_add_notify, 	arginfo_gupnp_service_proxy_add_notify)
