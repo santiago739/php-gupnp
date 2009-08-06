@@ -9,7 +9,8 @@ function gupnp_service_proxy_action_browse($proxy)
 	//$result = gupnp_service_proxy_action_get($proxy, 'GetSearchCapabilities', 'SearchCaps', GUPNP_TYPE_STRING);
 	//var_dump($result);
 	
-	gupnp_service_proxy_begin_action($proxy);
+	//gupnp_service_proxy_begin_action($proxy);
+	gupnp_service_proxy_send_action_hash($proxy);
 	//sleep(3);
 
 	printf("\n");

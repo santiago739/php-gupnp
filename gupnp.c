@@ -1995,6 +1995,105 @@ PHP_FUNCTION(gupnp_service_proxy_begin_action)
 }
 /* }}} */
 
+/* {{{ proto bool gupnp_service_proxy_action_set(resource proxy, string action, string name, mixed value, int type)
+   Send action with parameters to the service exposed by proxy asynchronously, calling callback on completion. */
+PHP_FUNCTION(gupnp_service_proxy_send_action_hash)
+{
+	zval *zproxy;
+	php_gupnp_service_proxy_t *sproxy;
+	GError *error = NULL;
+	
+	GHashTable *in_hash, *out_hash;
+	GValue g_value_in_1 = {0};
+	GValue g_value_in_2 = {0};
+	GValue g_value_in_3 = {0};
+	GValue g_value_in_4 = {0};
+	GValue g_value_in_5 = {0};
+	GValue g_value_in_6 = {0};
+	
+	GValue g_value_out_1 = {0};
+	
+	printf("[func] gupnp_service_proxy_send_action_hash\n");
+	
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &zproxy) == FAILURE) {
+		return;
+	}
+	
+	ZVAL_TO_SERVICE_PROXY(zproxy, sproxy);
+	
+	in_hash = g_hash_table_new(NULL, NULL);
+	out_hash = g_hash_table_new(NULL, NULL);
+	
+	g_value_init(&g_value_in_1, G_TYPE_STRING);
+	g_value_set_static_string (&g_value_in_1, "0");
+	g_hash_table_insert(in_hash, "ObjectID", &g_value_in_1);
+	
+	g_value_init(&g_value_in_2, G_TYPE_STRING);
+	g_value_set_static_string (&g_value_in_2, "BrowseDirectChildren");
+	g_hash_table_insert(in_hash, "BrowseFlag", &g_value_in_2);
+	
+	g_value_init(&g_value_in_3, G_TYPE_STRING);
+	g_value_set_static_string (&g_value_in_3, "*");
+	g_hash_table_insert(in_hash, "Filter", &g_value_in_3);
+	
+	g_value_init(&g_value_in_4, G_TYPE_UINT);
+	g_value_set_uint (&g_value_in_4, 1);
+	g_hash_table_insert(in_hash, "StartingIndex", &g_value_in_4);
+	
+	g_value_init(&g_value_in_5, G_TYPE_UINT);
+	g_value_set_uint (&g_value_in_5, 10);
+	g_hash_table_insert(in_hash, "RequestedCount", &g_value_in_5);
+	
+	g_value_init(&g_value_in_6, G_TYPE_STRING);
+	g_value_set_static_string (&g_value_in_6, "");
+	g_hash_table_insert(in_hash, "SortCriteria", &g_value_in_6);
+	
+	
+	g_value_init(&g_value_out_1, G_TYPE_STRING);
+	g_hash_table_insert(out_hash, "Result", &g_value_out_1);
+	
+	
+	
+	gupnp_service_proxy_send_action_hash(
+		sproxy->proxy, "Browse", &error, in_hash, out_hash
+		/* IN args */
+		/*
+		"ObjectID",
+		G_TYPE_STRING,
+		"0",
+		"BrowseFlag",
+		G_TYPE_STRING,
+		"BrowseDirectChildren",
+		"Filter",
+		G_TYPE_STRING,
+		"*",
+		"StartingIndex",
+		G_TYPE_UINT,
+		1,
+		"RequestedCount",
+		G_TYPE_UINT,
+		10,
+		"SortCriteria",
+		G_TYPE_STRING,
+		"",
+		NULL
+		*/
+	);
+	
+	printf("Result: %s\n", (char *)g_value_get_string(&g_value_out_1));
+	
+	g_hash_table_destroy(in_hash);
+	g_hash_table_destroy(out_hash);
+	
+	if (error != NULL) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to send action: %s", error->message);
+		g_error_free(error);
+		RETURN_FALSE;
+	}
+	RETURN_TRUE;
+}
+/* }}} */
+
 
 /* {{{ proto bool gupnp_service_proxy_set_subscribed(resource proxy, boolean subscribed)
    (Un)subscribes to the service. */
@@ -2657,6 +2756,7 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_service_proxy_action_set, 	arginfo_gupnp_service_proxy_action_set)
 	PHP_FE(gupnp_service_proxy_action_get, 	arginfo_gupnp_service_proxy_action_get)
 	PHP_FE(gupnp_service_proxy_begin_action, 	NULL)
+	PHP_FE(gupnp_service_proxy_send_action_hash, 	NULL)
 	PHP_FE(gupnp_service_proxy_set_subscribed, 	arginfo_gupnp_service_proxy_set_subscribed)
 	PHP_FE(gupnp_service_proxy_get_subscribed, 	arginfo_gupnp_service_proxy_get_subscribed)
 	PHP_FE(gupnp_service_proxy_add_notify, 	arginfo_gupnp_service_proxy_add_notify)
