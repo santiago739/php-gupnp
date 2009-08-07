@@ -10,7 +10,23 @@ function gupnp_service_proxy_action_browse($proxy)
 	//var_dump($result);
 	
 	//gupnp_service_proxy_begin_action($proxy);
-	gupnp_service_proxy_send_action_hash($proxy);
+	//gupnp_service_proxy_send_action_hash($proxy);
+	
+	$result = gupnp_service_proxy_send_action_tmp(
+		$proxy,
+		array(
+			array("ObjectID", GUPNP_TYPE_STRING, "0"),
+			array("BrowseFlag", GUPNP_TYPE_STRING, "BrowseDirectChildren"),
+			array("Filter", GUPNP_TYPE_STRING, "*"),
+			array("StartingIndex", GUPNP_TYPE_INT, 1),
+			array("RequestedCount", GUPNP_TYPE_INT, 10),
+			array("SortCriteria", GUPNP_TYPE_STRING, "")
+		),
+		array(
+			array("Result", GUPNP_TYPE_STRING)
+		)
+	);
+	var_dump($result);
 	//sleep(3);
 
 	printf("\n");
@@ -30,7 +46,7 @@ function gupnp_service_proxy_available_cb($proxy, $arg)
 	
 		gupnp_service_proxy_action_browse($proxy);
 		
-		//gupnp_control_point_browse_stop($arg['cp_service']);
+		gupnp_control_point_browse_stop($arg['cp_service']);
 		
 	}
 }
