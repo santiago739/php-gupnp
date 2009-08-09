@@ -2,32 +2,24 @@
 
 function gupnp_service_proxy_action_browse($proxy)
 {
-	//gupnp_service_proxy_action_set($proxy, 'Browse', 'ObjectID', "0", GUPNP_TYPE_STRING);
-	
-	//$result = gupnp_service_proxy_action_get($proxy, 'Browse', 'Result', GUPNP_TYPE_STRING);
-	//$result = gupnp_service_proxy_action_get($proxy, 'Browse', 'Result', GUPNP_TYPE_STRING);
-	//$result = gupnp_service_proxy_action_get($proxy, 'GetSearchCapabilities', 'SearchCaps', GUPNP_TYPE_STRING);
-	//var_dump($result);
-	
-	//gupnp_service_proxy_begin_action($proxy);
-	//gupnp_service_proxy_send_action_hash($proxy);
-	
-	$result = gupnp_service_proxy_send_action_tmp(
-		$proxy,
-		array(
-			array("ObjectID", GUPNP_TYPE_STRING, "0"),
-			array("BrowseFlag", GUPNP_TYPE_STRING, "BrowseDirectChildren"),
-			array("Filter", GUPNP_TYPE_STRING, "*"),
-			array("StartingIndex", GUPNP_TYPE_INT, 1),
-			array("RequestedCount", GUPNP_TYPE_INT, 10),
-			array("SortCriteria", GUPNP_TYPE_STRING, "")
-		),
-		array(
-			array("Result", GUPNP_TYPE_STRING)
-		)
+	$in_params = array(
+		array("ObjectID", GUPNP_TYPE_STRING, "0"),
+		array("BrowseFlag", GUPNP_TYPE_STRING, "BrowseDirectChildren"),
+		array("Filter", GUPNP_TYPE_STRING, "*"),
+		array("StartingIndex", GUPNP_TYPE_INT, 0),
+		array("RequestedCount", GUPNP_TYPE_INT, 10),
+		array("SortCriteria", GUPNP_TYPE_STRING, "")
 	);
+	
+	$out_params = array(
+		array("Result", GUPNP_TYPE_STRING),
+		array("NumberReturned", GUPNP_TYPE_INT),
+		array("TotalMatches", GUPNP_TYPE_INT),
+	);
+
+	$result = gupnp_service_proxy_send_action($proxy, 'Browse', $in_params, $out_params);
+	printf("Result:\n");
 	var_dump($result);
-	//sleep(3);
 
 	printf("\n");
 }
@@ -45,9 +37,7 @@ function gupnp_service_proxy_available_cb($proxy, $arg)
 		printf("\n");
 	
 		gupnp_service_proxy_action_browse($proxy);
-		
 		gupnp_control_point_browse_stop($arg['cp_service']);
-		
 	}
 }
 
@@ -92,12 +82,5 @@ $cb_device = "gupnp_device_proxy_available_cb";
 gupnp_control_point_callback_set($cp_device, GUPNP_SIGNAL_DEVICE_PROXY_AVAILABLE, $cb_device, $arg_device);
 
 
-//$arg_service = array('cp_service' => $cp_service);
-//$cb_service = "gupnp_service_proxy_available_cb";
-//gupnp_control_point_callback_set($cp_service, 
-//	GUPNP_SIGNAL_SERVICE_PROXY_AVAILABLE, $cb_service, $arg_service);
-
 /* Start for browsing */
 gupnp_control_point_browse_start($cp_device);
-
-//gupnp_control_point_browse_start($cp_service);

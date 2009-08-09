@@ -350,63 +350,6 @@ static void _php_gupnp_service_proxy_cb(GUPnPControlPoint *cp, GUPnPServiceProxy
 }
 /* }}} */
 
-//static void _php_gupnp_service_proxy_action_cb(GUPnPServiceProxy *proxy, GUPnPServiceProxyAction *action, gpointer user_data TSRMLS_DC)  /* {{{ */
-static void _php_gupnp_service_proxy_action_cb(GUPnPServiceProxy *proxy, GUPnPServiceProxyAction *action, gpointer user_data)
-{
-	char       *didl_xml;
-	guint32     number_returned;
-	guint32     total_matches;
-	GError     *error;
-
-	didl_xml = NULL;
-	error = NULL;
-	
-	//zval *args[2];
-	//zval retval;
-	
-	printf("[func] _php_gupnp_service_proxy_action_cb\n");
-	
-	gupnp_service_proxy_end_action(
-		proxy,
-		action,
-		&error,
-		/* OUT args */
-		"Result",
-		G_TYPE_STRING,
-		&didl_xml,
-		"NumberReturned",
-		G_TYPE_UINT,
-		&number_returned,
-		"TotalMatches",
-		G_TYPE_UINT,
-		&total_matches,
-		NULL
-	);
-	
-	printf("didl_xml: %s\n\n", didl_xml);
-	
-	/*
-	MAKE_STD_ZVAL(args[0]);
-	ZVAL_STRING(args[0], (char *)didl_xml, 1); 
-	
-	if (error && error->message) {
-		MAKE_STD_ZVAL(args[1]);
-		ZVAL_STRING(args[1], (char *)error->message, 1); 
-		g_error_free(error);
-	} else {
-		ALLOC_INIT_ZVAL(args[1]);
-	}
-	
-	if (call_user_function(EG(function_table), NULL, callback->func, &retval, 2, args TSRMLS_CC) == SUCCESS) {
-		zval_dtor(&retval);
-	}
-	zval_ptr_dtor(&(args[0]));
-	zval_ptr_dtor(&(args[1]));
-	*/
-	return;
-}
-/* }}} */
-
 static void _php_gupnp_service_proxy_available_cb(GUPnPControlPoint *cp, GUPnPServiceProxy *proxy, gpointer userdata) /* {{{ */
 {
 	php_gupnp_cpoint_t *cpoint = (php_gupnp_cpoint_t *)userdata;
@@ -756,6 +699,67 @@ zval *_php_gupnp_get_zval_by_gvalue(const GValue *g_value)  /* {{{ */
 			break; 
 	}
 	return z_value;
+}
+/* }}} */
+
+static GValue *_gupnp_get_new_gvalue(long g_type)  /* {{{ */
+{
+	GValue *g_value;
+	
+	g_value = (GValue *)ecalloc(1, sizeof(GValue));
+	g_value_init(g_value, g_type);
+	
+	return g_value;
+}
+/* }}} */
+
+static void _gupnp_gvalue_destroy(gpointer data)  /* {{{ */
+{
+	GValue *g_value = (GValue *)data;
+	efree(g_value);
+}
+/* }}} */
+
+static void _gupnp_hash_table_foreach_out_params(gpointer key, gpointer value, gpointer user_data)  /* {{{ */
+{
+	zval *array = (zval *)user_data;
+	zval *subarray; 
+	GValue *g_value = (GValue *)value;
+	char *name = (char *)key;
+	
+	/* Create a subarray */     
+	MAKE_STD_ZVAL(subarray); 
+    array_init(subarray); 
+	add_next_index_string(subarray, name, 1); 
+	add_next_index_long(subarray, G_VALUE_TYPE(value)); 
+	
+	/* Populate it with some numbers */
+	switch (G_VALUE_TYPE(value)) {
+		case G_TYPE_BOOLEAN:
+			add_next_index_bool(subarray, g_value_get_boolean(g_value)); 
+			break;
+		case G_TYPE_INT:
+			add_next_index_long(subarray, g_value_get_int(g_value));
+			break;
+		case G_TYPE_LONG:
+			add_next_index_long(subarray, g_value_get_long(g_value)); 
+			break;
+		case G_TYPE_FLOAT:
+			add_next_index_double(subarray, g_value_get_float(g_value));
+			break;
+		case G_TYPE_DOUBLE:
+			add_next_index_double(subarray, g_value_get_double(g_value));
+			break;
+		case G_TYPE_STRING: 
+			add_next_index_string(subarray, (char *)g_value_get_string(g_value), 1);
+			break;
+		default:
+			add_next_index_null(subarray);
+			break;
+	}
+	
+	/* Place the subarray in the parent */     
+	add_next_index_zval(array, subarray); 
 }
 /* }}} */
 
@@ -1794,24 +1798,16 @@ PHP_FUNCTION(gupnp_service_proxy_action_get)
 }
 /* }}} */
 
-static GValue *_gupnp_get_new_gvalue(long g_type)
-{
-	GValue *g_value;
-	
-	g_value = (GValue *)ecalloc(1, sizeof(GValue));
-	//printf("g_value: %p\n", g_value);
-	
-	g_value_init(g_value, g_type);
-	
-	return g_value;
-}
-
-PHP_FUNCTION(gupnp_service_proxy_send_action_tmp)
+/* {{{ proto mixed gupnp_service_proxy_send_action(resource proxy, string action, array in_params, array out_params)
+   Sends action action with parameters in_params to the service exposed by proxy synchronously and return out_params or false if an error occurred. */
+PHP_FUNCTION(gupnp_service_proxy_send_action)
 {
 	zval *z_in_params, *z_out_params;
 	zval **entry;
 	zval **z_name, **z_type, **z_value = NULL;
 	int entry_size, i = 0;
+	char *action;
+	int action_len;
 	
 	zval *z_proxy;
 	php_gupnp_service_proxy_t *sproxy;
@@ -1822,16 +1818,18 @@ PHP_FUNCTION(gupnp_service_proxy_send_action_tmp)
 	GValue *g_out_value;
 	
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "raa/", &z_proxy, &z_in_params, &z_out_params) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rsa/a/", 
+		&z_proxy, &action, &action_len, &z_in_params, &z_out_params) == FAILURE) {
 		return;
 	}
 
-	printf("[func] gupnp_service_proxy_send_action_tmp\n");
-	
 	ZVAL_TO_SERVICE_PROXY(z_proxy, sproxy);
 	
-	in_hash = g_hash_table_new(NULL, NULL);
-	out_hash = g_hash_table_new(NULL, NULL);
+	in_hash = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, 
+		_gupnp_gvalue_destroy);
+	out_hash = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, 
+		_gupnp_gvalue_destroy);
+	
 
 	for (zend_hash_internal_pointer_reset(Z_ARRVAL_P(z_in_params)), i = 0;
 		 zend_hash_get_current_data(Z_ARRVAL_P(z_in_params), (void **)&entry) == SUCCESS;
@@ -1847,117 +1845,85 @@ PHP_FUNCTION(gupnp_service_proxy_send_action_tmp)
 		if (entry_size > 1) {
 			zend_hash_internal_pointer_reset(Z_ARRVAL_PP(entry));
 
-			/* Check that we have a host */
+			/* Check that we have an input name */
 			if (zend_hash_get_current_data(Z_ARRVAL_PP(entry), (void **)&z_name) == FAILURE) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not get server host for entry #%d", i+1);
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not get input name for entry #%d", i+1);
 				continue;
 			}
 
-			/* Check that we have a port */
+			/* Check that we have an input value */
 			if (zend_hash_move_forward(Z_ARRVAL_PP(entry)) == FAILURE ||
 				zend_hash_get_current_data(Z_ARRVAL_PP(entry), (void **)&z_type) == FAILURE) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not get server port for entry #%d", i+1);
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not get input value for entry #%d", i+1);
 				continue;
 			}
 			
-			convert_to_string_ex(z_name);
-			convert_to_long_ex(z_type);
-
-			/* Try to get value */
+			/* Check that we have an input type */
 			if (zend_hash_move_forward(Z_ARRVAL_PP(entry)) == FAILURE ||
 				zend_hash_get_current_data(Z_ARRVAL_PP(entry), (void **)&z_value) == FAILURE) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not get server value for entry #%d", i+1);
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not get input type for entry #%d", i+1);
 				continue;
 			}
+
+			convert_to_string_ex(z_name);
+			convert_to_long_ex(z_type);
 			
 			switch (Z_LVAL_PP(z_type)) {
-				/*
 				case G_TYPE_BOOLEAN:
-					if (Z_TYPE_P(param_val) == IS_BOOL) {
-						result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
-									&error, param_name, param_type, Z_BVAL_P(param_val), NULL, NULL);
-					} else {
-						php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not boolean");
-						return;
-					}
+				{
+					g_in_value = _gupnp_get_new_gvalue(G_TYPE_BOOLEAN);
+					convert_to_boolean_ex(z_value);
+					g_value_set_boolean(g_in_value, Z_BVAL_PP(z_value));
 					break; 
-				
+				}
 				
 				case G_TYPE_INT:
-				case G_TYPE_LONG:
-					if (Z_TYPE_P(param_val) == IS_LONG) {
-						result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
-									&error, param_name, param_type, Z_LVAL_P(param_val), NULL, NULL);
-					} else {
-						php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not integer");
-						return;
-					}
+				{
+					g_in_value = _gupnp_get_new_gvalue(G_TYPE_INT);
+					convert_to_long_ex(z_value);
+					g_value_set_int(g_in_value, Z_LVAL_PP(z_value));
 					break; 
+				}
 				
-				case G_TYPE_FLOAT: 
-				case G_TYPE_DOUBLE: 
-					if (Z_TYPE_P(param_val) == IS_DOUBLE) {
-						result = gupnp_service_proxy_send_action(sproxy->proxy, action, 
-									&error, param_name, param_type, Z_DVAL_P(param_val), NULL, NULL);
-					} else {
-						php_error_docref(NULL TSRMLS_CC, E_WARNING, "'value' is not float");
-						return;
-					}
-					break; 
-				*/	
-				
-				case G_TYPE_INT:
 				case G_TYPE_LONG:
 				{
 					g_in_value = _gupnp_get_new_gvalue(G_TYPE_LONG);
-					//printf("g_in_value: %p\n", g_in_value);
 					convert_to_long_ex(z_value);
 					g_value_set_long(g_in_value, Z_LVAL_PP(z_value));
-					g_hash_table_insert(in_hash, Z_STRVAL_PP(z_name), g_in_value);
-					
-					printf("z_name: %s, z_type: %ld, value: %d\n", 
-						Z_STRVAL_PP(z_name), Z_LVAL_PP(z_type), Z_LVAL_PP(z_value));
+					break; 
+				}
+				
+				case G_TYPE_FLOAT: 
+				{
+					g_in_value = _gupnp_get_new_gvalue(G_TYPE_FLOAT);
+					convert_to_double_ex(z_value);
+					g_value_set_float(g_in_value, Z_DVAL_PP(z_value));
+					break; 
+				}
+				
+				case G_TYPE_DOUBLE: 
+				{
+					g_in_value = _gupnp_get_new_gvalue(G_TYPE_DOUBLE);
+					convert_to_double_ex(z_value);
+					g_value_set_double(g_in_value, Z_DVAL_PP(z_value));
 					break; 
 				}
 				
 				case G_TYPE_STRING: 
 				{
 					g_in_value = _gupnp_get_new_gvalue(G_TYPE_STRING);
-					//printf("g_in_value: %p\n", g_in_value);
 					convert_to_string_ex(z_value);
 					g_value_set_string(g_in_value, Z_STRVAL_PP(z_value));
-					g_hash_table_insert(in_hash, Z_STRVAL_PP(z_name), g_in_value);
-					
-					printf("z_name: %s, z_type: %ld, value: %s\n", 
-						Z_STRVAL_PP(z_name), Z_LVAL_PP(z_type), Z_STRVAL_PP(z_value));
 					break; 
 				}
 				
 				default: 
-					php_error_docref(NULL TSRMLS_CC, E_WARNING, "'type' is not correctly defined");
+					php_error_docref(NULL TSRMLS_CC, E_WARNING, "type is not correctly defined");
 					continue;
 			}
 			
-			//convert_to_long_ex(z_value);
-			//value = Z_LVAL_PP(z_value);
-			
-			
-			
-
-			/*list = memcached_server_list_append_with_value(list, Z_STRVAL_PP(z_name),
-															Z_LVAL_PP(z_type), value, &status);*/
-			
-	
-			//g_value_init(g_value_in, G_TYPE_STRING);
-			
-	
-			/*if (php_memc_handle_error(status TSRMLS_CC) == 0) {
-				continue;
-			}*/
+			g_hash_table_insert(in_hash, Z_STRVAL_PP(z_name), g_in_value);
 		}
-
-		/* catch-all for all errors */
-		//php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not add entry #%d to the server list", i+1);
 	}
 	
 	for (zend_hash_internal_pointer_reset(Z_ARRVAL_P(z_out_params)), i = 0;
@@ -1974,82 +1940,55 @@ PHP_FUNCTION(gupnp_service_proxy_send_action_tmp)
 		if (entry_size > 1) {
 			zend_hash_internal_pointer_reset(Z_ARRVAL_PP(entry));
 
-			/* Check that we have a host */
+			/* Check that we have an output name */
 			if (zend_hash_get_current_data(Z_ARRVAL_PP(entry), (void **)&z_name) == FAILURE) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not get server host for entry #%d", i+1);
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not get output name for entry #%d", i+1);
 				continue;
 			}
 
-			/* Check that we have a port */
+			/* Check that we have an output type */
 			if (zend_hash_move_forward(Z_ARRVAL_PP(entry)) == FAILURE ||
 				zend_hash_get_current_data(Z_ARRVAL_PP(entry), (void **)&z_type) == FAILURE) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not get server port for entry #%d", i+1);
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not get output type for entry #%d", i+1);
 				continue;
 			}
 			
 			convert_to_string_ex(z_name);
 			convert_to_long_ex(z_type);
-
-			switch (Z_LVAL_PP(z_type)) {
-				case G_TYPE_INT:
-				case G_TYPE_LONG:
-				{
-					g_out_value = _gupnp_get_new_gvalue(G_TYPE_LONG);
-					g_hash_table_insert(out_hash, Z_STRVAL_PP(z_name), g_out_value);
-					printf("z_name: %s, z_type: %ld\n", 
-						Z_STRVAL_PP(z_name), Z_LVAL_PP(z_type));
-					break; 
-				}
-				
-				case G_TYPE_STRING: 
-				{
-					g_out_value = _gupnp_get_new_gvalue(G_TYPE_STRING);
-					g_hash_table_insert(out_hash, Z_STRVAL_PP(z_name), g_out_value);
-					
-					printf("z_name: %s, z_type: %ld\n", 
-						Z_STRVAL_PP(z_name), Z_LVAL_PP(z_type));
-					break; 
-				}
-				
-				default: 
-					php_error_docref(NULL TSRMLS_CC, E_WARNING, "'type' is not correctly defined");
-					continue;
+			
+			if ((Z_LVAL_PP(z_type) == G_TYPE_BOOLEAN)
+					|| (Z_LVAL_PP(z_type) == G_TYPE_INT)
+					|| (Z_LVAL_PP(z_type) == G_TYPE_LONG)
+					|| (Z_LVAL_PP(z_type) == G_TYPE_FLOAT)
+					|| (Z_LVAL_PP(z_type) == G_TYPE_DOUBLE)
+					|| (Z_LVAL_PP(z_type) == G_TYPE_STRING)) {
+				g_out_value = _gupnp_get_new_gvalue(Z_LVAL_PP(z_type));
+				g_hash_table_insert(out_hash, Z_STRVAL_PP(z_name), g_out_value);
+			} else {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "'type' is not correctly defined");
+				continue;
 			}
 		}
-
-		/* catch-all for all errors */
-		//php_error_docref(NULL TSRMLS_CC, E_WARNING, "could not add entry #%d to the server list", i+1);
 	}
 
-	//status = memcached_server_push(i_obj->memc, list);
-	//memcached_server_list_free(list);
-	//if (php_memc_handle_error(status TSRMLS_CC) < 0) {
-	//	RETURN_FALSE;
-	//}
-	
-	//g_value_init(&g_value_out_1, G_TYPE_STRING);
-	//g_hash_table_insert(out_hash, "Result", &g_value_out_1);
-	
-	gupnp_service_proxy_send_action_hash(sproxy->proxy, "Browse", 
-		&error, in_hash, out_hash);
-	
-	//printf("Result: %s\n", (char *)g_value_get_string(g_out_value));
-	
-	g_hash_table_destroy(in_hash);
-	g_hash_table_destroy(out_hash);
+	gupnp_service_proxy_send_action_hash(sproxy->proxy, action, &error, in_hash, out_hash);
 	
 	if (error != NULL) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unable to send action: %s", error->message);
 		g_error_free(error);
+		
+		g_hash_table_destroy(in_hash);
+		g_hash_table_destroy(out_hash);
+		
 		RETURN_FALSE;
 	}
 	
 	array_init(return_value);
-	add_assoc_string(return_value, "Result", g_value_get_string(g_out_value), 1);
-	
-	//RETURN_TRUE;
+	g_hash_table_foreach(out_hash, _gupnp_hash_table_foreach_out_params, return_value);
+	g_hash_table_destroy(in_hash);
+	g_hash_table_destroy(out_hash);
 }
-
+/* }}} */
 
 /* {{{ proto bool gupnp_service_proxy_set_subscribed(resource proxy, boolean subscribed)
    (Un)subscribes to the service. */
@@ -2613,6 +2552,13 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_proxy_action_get, 0, 0, 4)
 	ZEND_ARG_INFO(0, type)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_proxy_send_action, 0, 0, 4)
+	ZEND_ARG_INFO(0, proxy)
+	ZEND_ARG_INFO(0, action)
+	ZEND_ARG_INFO(0, in_params)
+	ZEND_ARG_INFO(0, out_params)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_gupnp_service_proxy_set_subscribed, 0, 0, 2)
 	ZEND_ARG_INFO(0, proxy)
 	ZEND_ARG_INFO(0, subscribed)
@@ -2711,11 +2657,7 @@ zend_function_entry gupnp_functions[] = {
 	PHP_FE(gupnp_service_introspection_get_state_variable, 	arginfo_gupnp_service_introspection_get_state_variable)
 	PHP_FE(gupnp_service_proxy_action_set, 	arginfo_gupnp_service_proxy_action_set)
 	PHP_FE(gupnp_service_proxy_action_get, 	arginfo_gupnp_service_proxy_action_get)
-	
-	//PHP_FE(gupnp_service_proxy_begin_action, 	NULL)
-	//PHP_FE(gupnp_service_proxy_send_action_hash, 	NULL)
-	PHP_FE(gupnp_service_proxy_send_action_tmp, 	NULL)
-	
+	PHP_FE(gupnp_service_proxy_send_action, 	arginfo_gupnp_service_proxy_send_action)
 	PHP_FE(gupnp_service_proxy_set_subscribed, 	arginfo_gupnp_service_proxy_set_subscribed)
 	PHP_FE(gupnp_service_proxy_get_subscribed, 	arginfo_gupnp_service_proxy_get_subscribed)
 	PHP_FE(gupnp_service_proxy_add_notify, 	arginfo_gupnp_service_proxy_add_notify)

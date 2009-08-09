@@ -12,7 +12,7 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Author:                                                              |
+  | Author: Alexey Romanenko <santiago739@gmail.com>                     |
   +----------------------------------------------------------------------+
 */
 
@@ -69,9 +69,7 @@ PHP_FUNCTION(gupnp_service_introspection_get_state_variable);
 PHP_FUNCTION(gupnp_service_proxy_action_set);
 PHP_FUNCTION(gupnp_service_proxy_action_get);
 
-//PHP_FUNCTION(gupnp_service_proxy_begin_action);
-//PHP_FUNCTION(gupnp_service_proxy_send_action_hash);
-PHP_FUNCTION(gupnp_service_proxy_send_action_tmp);
+PHP_FUNCTION(gupnp_service_proxy_send_action);
 
 PHP_FUNCTION(gupnp_service_proxy_set_subscribed);
 PHP_FUNCTION(gupnp_service_proxy_get_subscribed);
