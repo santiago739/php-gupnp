@@ -18,7 +18,25 @@ function gupnp_service_proxy_action_browse($proxy)
 	);
 
 	$result = gupnp_service_proxy_send_action($proxy, 'Browse', $in_params, $out_params);
-	printf("Result:\n");
+	printf("Result, action 'Browse':\n");
+	var_dump($result);
+	
+	$in_params = array();
+	$out_params = array(
+		array("SearchCaps", GUPNP_TYPE_STRING)
+	);
+	
+	$result = gupnp_service_proxy_send_action($proxy, 'GetSearchCapabilities', $in_params, $out_params);
+	printf("Result, action 'GetSearchCapabilities':\n");
+	var_dump($result);
+	
+	$in_params = array();
+	$out_params = array(
+		array("Id", GUPNP_TYPE_INT)
+	);
+	
+	$result = gupnp_service_proxy_send_action($proxy, 'GetSystemUpdateID', $in_params, $out_params);
+	printf("Result, action 'GetSystemUpdateID':\n");
 	var_dump($result);
 
 	printf("\n");
@@ -75,6 +93,9 @@ if (!$context) {
 /* Create the control point, searching for MediaTomb */
 $cp_device = gupnp_control_point_new($context, "urn:schemas-upnp-org:device:MediaServer:1");
 $cp_service = gupnp_control_point_new($context, "urn:schemas-upnp-org:service:ContentDirectory:1");
+//$cp_device = gupnp_control_point_new($context, "urn:schemas-upnp-org:device:MediaRenderer:1");
+
+//$cp_service = gupnp_control_point_new($context, "urn:schemas-upnp-org:service:AVTransport:1");
 
 /* Connect to the service-found callback */
 $arg_device = array('cp_device' => $cp_device, 'cp_service' => $cp_service);
