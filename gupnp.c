@@ -643,7 +643,7 @@ static void _php_gupnp_service_get_introspection_cb(GUPnPServiceInfo *info, GUPn
 }
 /* }}} */
 
-char *_php_gupnp_get_value_type_name(GType g_type)  /* {{{ */
+static char *_php_gupnp_get_value_type_name(GType g_type)  /* {{{ */
 {
 	switch (g_type) {
 		case G_TYPE_BOOLEAN:
@@ -664,11 +664,12 @@ char *_php_gupnp_get_value_type_name(GType g_type)  /* {{{ */
 }
 /* }}} */
 
-zval *_php_gupnp_get_zval_by_gvalue(const GValue *g_value)  /* {{{ */
+static int _php_gupnp_get_zval_by_gvalue(zval *z_value, const GValue *g_value)  /* {{{ */
 {
-	zval *z_value;
+	if (!z_value || !g_value) {
+		return -1;
+	}
 	
-	MAKE_STD_ZVAL(z_value);
 	switch (G_VALUE_TYPE(g_value)) {
 		case G_TYPE_BOOLEAN: 
 			ZVAL_BOOL(z_value, g_value_get_boolean(g_value));
@@ -698,7 +699,7 @@ zval *_php_gupnp_get_zval_by_gvalue(const GValue *g_value)  /* {{{ */
 			ZVAL_NULL(z_value);
 			break; 
 	}
-	return z_value;
+	return 0;
 }
 /* }}} */
 
@@ -1601,38 +1602,84 @@ PHP_FUNCTION(gupnp_service_introspection_get_state_variable)
 	
 	switch (variable->type) {
 		case G_TYPE_BOOLEAN:
-			z_default_value = _php_gupnp_get_zval_by_gvalue(&(variable->default_value));
-			add_assoc_bool(return_value, "default_value", Z_BVAL_P(z_default_value));
+		{
+			MAKE_STD_ZVAL(z_default_value);
+			if (_php_gupnp_get_zval_by_gvalue(z_default_value, &(variable->default_value)) == 0) {
+				add_assoc_bool(return_value, "default_value", Z_BVAL_P(z_default_value));
+			}
+			zval_ptr_dtor(&z_default_value);
+			
 			break;
+		}
 			
 		case G_TYPE_INT:
 		case G_TYPE_LONG:
-			z_default_value = _php_gupnp_get_zval_by_gvalue(&(variable->default_value));
-			z_minimum 		= _php_gupnp_get_zval_by_gvalue(&(variable->minimum));
-			z_maximum 		= _php_gupnp_get_zval_by_gvalue(&(variable->maximum));
-			z_step 			= _php_gupnp_get_zval_by_gvalue(&(variable->step));
-			add_assoc_long(return_value, "default_value", Z_LVAL_P(z_default_value));
-			add_assoc_long(return_value, "minimum", Z_LVAL_P(z_minimum));
-			add_assoc_long(return_value, "maximum", Z_LVAL_P(z_maximum));
-			add_assoc_long(return_value, "step", Z_LVAL_P(z_step));
-			break;
+		{
+			MAKE_STD_ZVAL(z_default_value);
+			MAKE_STD_ZVAL(z_minimum);
+			MAKE_STD_ZVAL(z_maximum);
+			MAKE_STD_ZVAL(z_step);
 			
+			if (_php_gupnp_get_zval_by_gvalue(z_default_value, &(variable->default_value)) == 0) {
+				add_assoc_long(return_value, "default_value", Z_LVAL_P(z_default_value));
+			}
+			if (_php_gupnp_get_zval_by_gvalue(z_minimum, &(variable->minimum)) == 0) {
+				add_assoc_long(return_value, "minimum", Z_LVAL_P(z_minimum));
+			}
+			if (_php_gupnp_get_zval_by_gvalue(z_maximum, &(variable->maximum)) == 0) {
+				add_assoc_long(return_value, "maximum", Z_LVAL_P(z_maximum));
+			}
+			if (_php_gupnp_get_zval_by_gvalue(z_step, &(variable->step)) == 0) {
+				add_assoc_long(return_value, "step", Z_LVAL_P(z_step));
+			}
+			
+			zval_ptr_dtor(&z_default_value);
+			zval_ptr_dtor(&z_minimum);
+			zval_ptr_dtor(&z_maximum);
+			zval_ptr_dtor(&z_step);
+			
+			break;
+		}	
+		
 		case G_TYPE_FLOAT:
 		case G_TYPE_DOUBLE:
-			z_default_value = _php_gupnp_get_zval_by_gvalue(&(variable->default_value));
-			z_minimum 		= _php_gupnp_get_zval_by_gvalue(&(variable->minimum));
-			z_maximum 		= _php_gupnp_get_zval_by_gvalue(&(variable->maximum));
-			z_step 			= _php_gupnp_get_zval_by_gvalue(&(variable->step));
-			add_assoc_double(return_value, "default_value", Z_DVAL_P(z_default_value));
-			add_assoc_double(return_value, "minimum", Z_DVAL_P(z_minimum));
-			add_assoc_double(return_value, "maximum", Z_DVAL_P(z_maximum));
-			add_assoc_double(return_value, "step", Z_DVAL_P(z_step));
-			break;
+		{
+			MAKE_STD_ZVAL(z_default_value);
+			MAKE_STD_ZVAL(z_minimum);
+			MAKE_STD_ZVAL(z_maximum);
+			MAKE_STD_ZVAL(z_step);
 			
-		case G_TYPE_STRING:
-			z_default_value = _php_gupnp_get_zval_by_gvalue(&(variable->default_value));
-			add_assoc_string(return_value, "default_value", Z_STRVAL_P(z_default_value), 1);
+			if (_php_gupnp_get_zval_by_gvalue(z_default_value, &(variable->default_value)) == 0) {
+				add_assoc_double(return_value, "default_value", Z_DVAL_P(z_default_value));
+			}
+			if (_php_gupnp_get_zval_by_gvalue(z_minimum, &(variable->minimum)) == 0) {
+				add_assoc_double(return_value, "minimum", Z_DVAL_P(z_minimum));
+			}
+			if (_php_gupnp_get_zval_by_gvalue(z_maximum, &(variable->maximum)) == 0) {
+				add_assoc_double(return_value, "maximum", Z_DVAL_P(z_maximum));
+			}
+			if (_php_gupnp_get_zval_by_gvalue(z_step, &(variable->step)) == 0) {
+				add_assoc_double(return_value, "step", Z_DVAL_P(z_step));
+			}
+			
+			zval_ptr_dtor(&z_default_value);
+			zval_ptr_dtor(&z_minimum);
+			zval_ptr_dtor(&z_maximum);
+			zval_ptr_dtor(&z_step);
+			
 			break;
+		}
+		
+		case G_TYPE_STRING:
+		{
+			MAKE_STD_ZVAL(z_default_value);
+			if (_php_gupnp_get_zval_by_gvalue(z_default_value, &(variable->default_value)) == 0) {
+				add_assoc_string(return_value, "default_value", Z_STRVAL_P(z_default_value), 1);
+			}
+			zval_ptr_dtor(&z_default_value);
+
+			break;
+		}
 	}
 	
 }
