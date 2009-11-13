@@ -14,12 +14,13 @@ function service_proxy_available_cb($proxy, $arg)
 
 	/* Add notify if status will be changed */
 	if (!gupnp_service_proxy_add_notify($proxy, "Status", 
-			GUPNP_TYPE_BOOLEAN, "status_changed_cb", NULL)) {
+			GUPNP_TYPE_BOOLEAN, "status_changed_cb", $arg)) {
 		printf("Failed to add notify\n");
 	}
 	
 	$introspection = gupnp_service_info_get_introspection($proxy);
 	$status_val = gupnp_service_introspection_get_state_variable($introspection, 'Status');
+	printf("Status state value:\n");
 	var_dump($status_val);
 
 	if ($mode == 'TOGGLE') {
@@ -40,8 +41,6 @@ function service_proxy_available_cb($proxy, $arg)
 	} else {
 		printf("Set switch to %s.\n", $target ? "on" : "off");
 	}
-
-	//gupnp_control_point_browse_stop($arg['cp']);
 }
 
 function status_changed_cb($variable, $value, $arg)
@@ -50,6 +49,7 @@ function status_changed_cb($variable, $value, $arg)
 	printf("\tvariable name: %s\n", $variable);
 	printf("\tvalue: %s\n", (int)$value);
 	printf("\n");
+	gupnp_control_point_browse_stop($arg['cp']);
 }
 
 /* Check and parse command line arguments */
