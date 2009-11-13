@@ -93,9 +93,6 @@ if (!$context) {
 /* Create the control point, searching for MediaTomb */
 $cp_device = gupnp_control_point_new($context, "urn:schemas-upnp-org:device:MediaServer:1");
 $cp_service = gupnp_control_point_new($context, "urn:schemas-upnp-org:service:ContentDirectory:1");
-//$cp_device = gupnp_control_point_new($context, "urn:schemas-upnp-org:device:MediaRenderer:1");
-
-//$cp_service = gupnp_control_point_new($context, "urn:schemas-upnp-org:service:AVTransport:1");
 
 /* Connect to the service-found callback */
 $arg_device = array('cp_device' => $cp_device, 'cp_service' => $cp_service);
